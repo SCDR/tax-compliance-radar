@@ -7,6 +7,15 @@
 - `frontend/`: React + Vite 页面骨架
 - `docs/`: 需求、API 和部署文档
 
+## 📚 开发文档
+
+| 文档 | 说明 |
+|------|------|
+| [业务维度扩展指南](docs/business_dimensions_guide.md) | 新增业务维度的完整开发流程（零代码侵入式扩展） |
+| [API 文档](docs/API_DOCS.md) | 接口说明与调用示例 |
+| [部署文档](docs/DEPLOYMENT.md) | 环境部署与运维指南 |
+| [需求分析](docs/Requirements%20Analysis.md) | 产品需求与架构说明 |
+
 ## 快速启动
 
 后端：
