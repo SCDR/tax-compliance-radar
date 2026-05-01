@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
+from tax_compliance_radar.config import settings
 from tax_compliance_radar.models.schemas import (
     ApiResponse,
     MultiCountryAuditRequest,
@@ -29,6 +30,7 @@ async def submit_multi_country_audit(request: MultiCountryAuditRequest) -> ApiRe
         - 按国家分组的详细结果
         - 所有风险混合列表（保留来源标签）
         - 所有建议混合列表（保留来源标签）
+        - 强制免责声明
     """
     # 验证所有国家都被支持
     for code in request.selected_countries:
@@ -45,7 +47,11 @@ async def submit_multi_country_audit(request: MultiCountryAuditRequest) -> ApiRe
         )
         result = await multi_strategy.aevaluate(request.business_profile)
 
-        return ApiResponse(data=result.model_dump())
+        # 注入免责声明
+        result_dict = result.model_dump()
+        result_dict["disclaimer"] = settings.disclaimer_text
+
+        return ApiResponse(data=result_dict)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"审核失败: {str(e)}")
