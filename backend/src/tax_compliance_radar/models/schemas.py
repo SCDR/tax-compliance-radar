@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal, List, Dict
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ==================== 来源标签系统 ====================
@@ -63,6 +63,7 @@ class MultiCountryAuditReport(BaseModel):
     results_by_country: Dict[str, CountryAuditResult]  # 按国家分组
     all_risks: List[SourcedRiskItem]  # 所有风险混合但保留来源
     all_suggestions: List[SourcedSuggestion]  # 所有建议混合但保留来源
+    disclaimer: str  # 免责声明
 
 
 class BusinessProfile(BaseModel):
@@ -101,11 +102,41 @@ class BusinessProfile(BaseModel):
         description="按国家区分是否有本地公司主体"
     )
 
+    @field_validator("annual_sales_by_country")
+    @classmethod
+    def validate_annual_sales(cls, v: Dict[str, int]) -> Dict[str, int]:
+        """验证每个国家的年销售额非负且不超过上限"""
+        for country, value in v.items():
+            if value < 0:
+                raise ValueError(f"国家 {country} 的年销售额不能为负数")
+            if value > 1000000000000:  # 1万亿
+                raise ValueError(f"国家 {country} 的年销售额超过上限")
+        return v
+
+    @field_validator("monthly_orders_by_country")
+    @classmethod
+    def validate_monthly_orders(cls, v: Dict[str, int]) -> Dict[str, int]:
+        """验证每个国家的月订单量非负"""
+        for country, value in v.items():
+            if value < 0:
+                raise ValueError(f"国家 {country} 的月订单量不能为负数")
+            if value > 100000000:  # 1亿
+                raise ValueError(f"国家 {country} 的月订单量超过上限")
+        return v
+
 
 class MultiCountryAuditRequest(BaseModel):
     """多国组合审核请求"""
     selected_countries: List[str]  # ["TH", "VN", "MY"]
     business_profile: BusinessProfile
+
+    @field_validator("selected_countries")
+    @classmethod
+    def validate_selected_countries(cls, v: List[str]) -> List[str]:
+        """验证至少选择一个国家"""
+        if not v or len(v) == 0:
+            raise ValueError("至少需要选择一个国家进行审核")
+        return v
 
 
 # ==================== QA相关模型 ====================
@@ -162,8 +193,8 @@ class QAHistoryItem(BaseModel):
 class AuditRequest(BaseModel):
     target_market: Literal["泰国"]
     business_type: Literal["跨境电商零售", "品牌出海直营", "外贸综合服务"]
-    annual_sales: int = Field(..., ge=0)
-    platforms: list[Literal["Shopee", "Lazada", "TikTok Shop"]] = Field(default_factory=list)
+    annual_sales: int = Field(..., ge=0, le=1000000000000)  # 上限1万亿泰铢
+    platforms: list[Literal["Shopee", "Lazada", "TikTok Shop"]] = Field(default_factory=list, max_length=10)
 
 
 class RiskItem(BaseModel):
