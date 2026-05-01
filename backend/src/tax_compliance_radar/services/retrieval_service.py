@@ -8,6 +8,7 @@ import chromadb
 
 from tax_compliance_radar.config import CHROMA_COLLECTION_NAME, CHROMA_PATH, settings
 from tax_compliance_radar.services.embedding_service import embed_text
+from tax_compliance_radar.services.logger import log_retrieval_call
 
 SIMILARITY_THRESHOLD = settings.retrieval.similarity_threshold
 TOP_K_RESULTS = settings.retrieval.top_k_results
@@ -40,6 +41,7 @@ def _get_chroma_collection() -> Any:
         return None
 
 
+@log_retrieval_call
 def search_regulations(query_text: str, top_k: int = TOP_K_RESULTS) -> RetrievalResult:
     """
     搜索法规并执行边界条件:

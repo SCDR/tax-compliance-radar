@@ -89,13 +89,21 @@ JSON_TEMPLATE = """
 """.strip()
 
 
-def get_risk_detection_prompt(country_code: str, business_data: Dict[str, Any]) -> str:
+def get_risk_detection_prompt(
+    country_code: str,
+    business_data: Dict[str, Any],
+    retrieval_result=None,
+) -> str:
     """获取指定国家的风险检测提示词
 
     🌟 自动扩展能力：
     - 自动格式化所有业务维度字段到提示词
     - 新增业务维度无需修改此函数
-    - 自动处理列表、布尔值等特殊类型
+
+    Args:
+        country_code: 国家代码
+        business_data: 业务数据字典
+        retrieval_result: 可选，外部传入的检索结果（用于复用，减少重复检索）
     """
     config = CountryRegistry.get(country_code)
     currency_symbol = config.currency_symbol
@@ -127,17 +135,17 @@ def get_risk_detection_prompt(country_code: str, business_data: Dict[str, Any]) 
 
     business_info_block = "\n".join(business_info_lines)
 
-    # 构建检索查询（使用主要字段）
-    query_parts = [
-        str(business_data.get("business_type", "")),
-        str(business_data.get("product_categories", "")),
-        f"{business_data.get('annual_sales', 0)}",
-        "VAT 风险"
-    ]
-    query = " ".join([p for p in query_parts if p])
-
-    # 构建法规上下文
-    retrieval_result = search_regulations(query, top_k=3)
+    # 构建法规上下文（优先复用外部传入的检索结果，避免重复检索）
+    if retrieval_result is None:
+        # 构建检索查询（使用主要字段）
+        query_parts = [
+            str(business_data.get("business_type", "")),
+            str(business_data.get("product_categories", "")),
+            f"{business_data.get('annual_sales', 0)}",
+            "VAT 风险"
+        ]
+        query = " ".join([p for p in query_parts if p])
+        retrieval_result = search_regulations(query, top_k=2)  # 减少召回数量
 
     if retrieval_result.below_threshold or not retrieval_result.documents:
         regulation_context = "无相关法规检索结果"
@@ -175,8 +183,13 @@ def get_risk_detection_prompt(country_code: str, business_data: Dict[str, Any]) 
 """.strip()
 
 
-def detect_additional_risks(business: AuditRequest) -> list[RiskItem]:
-    """使用RAG + AI识别规则引擎遗漏的潜在风险（兼容旧版单国家）"""
+def detect_additional_risks(business: AuditRequest, retrieval_result=None) -> list[RiskItem]:
+    """使用RAG + AI识别规则引擎遗漏的潜在风险（兼容旧版单国家）
+
+    Args:
+        business: 业务信息
+        retrieval_result: 可选，外部传入的检索结果（用于复用，减少重复检索）
+    """
     business_data = {
         "business_type": business.business_type,
         "annual_sales": business.annual_sales,

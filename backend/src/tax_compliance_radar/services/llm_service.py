@@ -4,10 +4,9 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-import ollama  # type: ignore[import-not-found]
-
 from tax_compliance_radar.config import settings
 from tax_compliance_radar.models.schemas import AuditRequest, QAAnswer
+from tax_compliance_radar.services.llm_providers import get_llm_provider
 from tax_compliance_radar.services.retrieval_service import (
     RetrievalResult,
     build_context_prompt,
@@ -76,63 +75,19 @@ class LLMResult:
     content: str
 
 
-def _client() -> ollama.Client:
-    return ollama.Client(host=settings.llm.base_url)
-
-
-def _async_client() -> ollama.AsyncClient:
-    """异步客户端"""
-    return ollama.AsyncClient(host=settings.llm.base_url)
-
-
-def _generate(model: str, system: str, user: str) -> str:
-    response = _client().generate(
-        model=model,
-        prompt=f"{system}\n\n{user}",
-        format=settings.llm.generation_format,
-        options={
-            "temperature": settings.llm.generation_temperature,
-            "num_predict": settings.llm.generation_num_predict,
-        },
-    )
-    return response["response"]
-
-
 def _chat_with_fallback(system: str, user: str) -> tuple[str, str]:
-    candidates = (settings.llm.model, *settings.llm.fallback_models)
-    last_error: Exception | None = None
-    for model in candidates:
-        try:
-            return model, _generate(model, system, user)
-        except Exception as exc:  # noqa: BLE001
-            last_error = exc
-    raise RuntimeError(f"Ollama 调用失败: {last_error}") from last_error
+    """带降级策略的LLM调用
 
-
-async def _agenerate(model: str, system: str, user: str) -> str:
-    """异步生成"""
-    response = await _async_client().generate(
-        model=model,
-        prompt=f"{system}\n\n{user}",
-        format=settings.llm.generation_format,
-        options={
-            "temperature": settings.llm.generation_temperature,
-            "num_predict": settings.llm.generation_num_predict,
-        },
-    )
-    return response["response"]
+    使用Provider工厂获取配置指定的LLM后端
+    """
+    provider = get_llm_provider()
+    return provider.chat_with_fallback(system, user)
 
 
 async def _achat_with_fallback(system: str, user: str) -> tuple[str, str]:
     """异步调用带降级"""
-    candidates = (settings.llm.model, *settings.llm.fallback_models)
-    last_error: Exception | None = None
-    for model in candidates:
-        try:
-            return model, await _agenerate(model, system, user)
-        except Exception as exc:  # noqa: BLE001
-            last_error = exc
-    raise RuntimeError(f"Ollama 异步调用失败: {last_error}") from last_error
+    provider = get_llm_provider()
+    return await provider.achat_with_fallback(system, user)
 
 
 def _extract_json(content: str) -> dict[str, Any]:
