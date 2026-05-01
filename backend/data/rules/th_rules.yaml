@@ -50,6 +50,42 @@ rules:
       regulation_base: 泰国增值税法第82/1条
       violation_consequence: 未按要求申报可能产生高额罚款并影响企业信用
 
+  # ===== 新维度规则示例：商品类目 =====
+  - rule_id: TH_R005
+    description: 电子产品类目强制合规认证
+    category: product_compliance
+    condition: "product_categories and '电子产品' in product_categories"
+    risk_template:
+      risk_level: 高风险
+      risk_desc: 销售电子产品需取得泰国 NBTC 认证，否则可能面临清关障碍
+      trigger_condition: 销售电子产品类目
+      regulation_base: 泰国电信设备法案 B.E. 2551
+      violation_consequence: 货物被扣、罚款、店铺封禁
+
+  # ===== 新维度规则示例：高订单量 =====
+  - rule_id: TH_R006
+    description: 高订单量商家需进行月度税务审计
+    category: reporting
+    condition: "monthly_orders and monthly_orders > 5000"
+    risk_template:
+      risk_level: 中风险
+      risk_desc: 月订单超过5000单的商家需进行月度税务专项审计
+      trigger_condition: 月订单量超过5000单
+      regulation_base: 泰国税务局高交易量监管规定
+      violation_consequence: 税务抽查风险增加
+
+  # ===== 新维度规则示例：本地仓储模式 =====
+  - rule_id: TH_R007
+    description: 本地仓储模式合规要求
+    category: registration
+    condition: "warehousing_mode == '本地仓' and has_local_entity == False"
+    risk_template:
+      risk_level: 高风险
+      risk_desc: 使用泰国本地仓但未注册本地商业主体，存在合规风险
+      trigger_condition: 使用本地仓储模式但无本地公司
+      regulation_base: 泰国外商经营法
+      violation_consequence: 仓储服务商终止服务、税务处罚
+
 # 默认建议列表
 suggestions:
   - type: general
