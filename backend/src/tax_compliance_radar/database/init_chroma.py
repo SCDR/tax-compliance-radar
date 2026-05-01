@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import chromadb
 
-from tax_compliance_radar.config import CHROMA_COLLECTION_NAME, CHROMA_PATH
+from tax_compliance_radar.config import CHROMA_COLLECTION_NAME, CHROMA_PATH, settings
 
 
 def main() -> None:
@@ -11,9 +11,9 @@ def main() -> None:
     client.get_or_create_collection(
         name=CHROMA_COLLECTION_NAME,
         metadata={
-            "description": "Thailand VAT regulations index",
-            "embedding_model": "qwen3-embedding:0.6b",
-            "language": "zh",
+            "description": settings.chroma_meta.description,
+            "embedding_model": settings.llm.embedding_model,
+            "language": settings.chroma_meta.language,
         },
     )
     print(f"Chroma collection initialized: {CHROMA_COLLECTION_NAME}")

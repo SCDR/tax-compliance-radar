@@ -30,11 +30,44 @@ class LLMBackendConfig:
 
 
 @dataclass(frozen=True)
+class RetrievalConfig:
+    """RAG检索配置"""
+    similarity_threshold: float = 0.55
+    top_k_results: int = 3
+
+
+@dataclass(frozen=True)
+class RAGConfig:
+    """文档分块与向量化配置"""
+    chunk_size: int = 512
+    chunk_overlap: int = 50
+
+
+@dataclass(frozen=True)
+class RulesConfig:
+    """合规规则阈值配置"""
+    vat_registration_threshold: int = 1800000
+    low_value_goods_threshold: int = 1500
+
+
+@dataclass(frozen=True)
+class ChromaMetadataConfig:
+    """Chroma集合元数据配置"""
+    description: str = "Thailand VAT regulations index"
+    language: str = "zh"
+    similarity_space: str = "cosine"
+
+
+@dataclass(frozen=True)
 class Settings:
     api_prefix: str = "/api/v1"
     app_name: str = "Tax Compliance Radar"
     environment: str = os.getenv("TCR_ENV", "development")
     llm: LLMBackendConfig = field(default_factory=LLMBackendConfig)
+    retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
+    rag: RAGConfig = field(default_factory=RAGConfig)
+    rules: RulesConfig = field(default_factory=RulesConfig)
+    chroma_meta: ChromaMetadataConfig = field(default_factory=ChromaMetadataConfig)
     disclaimer_text: str = DISCLAIMER_TEXT
 
 

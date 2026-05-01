@@ -80,7 +80,27 @@ def parse_regulation_file(path: Path) -> RegulationDoc:
     )
 
 
-def chunk_text(text: str, chunk_size: int = 512, chunk_overlap: int = 50) -> list[str]:
+def _clean_markdown(text: str) -> str:
+    """清理Markdown标记，保留纯文本语义"""
+    # 移除标题标记 (#, ##, ###, ...)
+    cleaned = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
+    # 移除加粗/斜体标记
+    cleaned = re.sub(r"\*\*(.*?)\*\*", r"\1", cleaned)
+    cleaned = re.sub(r"__(.*?)__", r"\1", cleaned)
+    cleaned = re.sub(r"\*(.*?)\*", r"\1", cleaned)
+    # 移除列表标记
+    cleaned = re.sub(r"^\s*[-*+]\s+", "", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"^\s*\d+\.\s+", "", cleaned, flags=re.MULTILINE)
+    # 移除行首的空格
+    cleaned = re.sub(r"^\s+", "", cleaned, flags=re.MULTILINE)
+    # 压缩多余的空行
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
+def chunk_text(text: str, chunk_size: int | None = None, chunk_overlap: int | None = None) -> list[str]:
+    chunk_size = chunk_size if chunk_size is not None else settings.rag.chunk_size
+    chunk_overlap = chunk_overlap if chunk_overlap is not None else settings.rag.chunk_overlap
     if chunk_size <= 0:
         raise ValueError("chunk_size must be positive")
     if chunk_overlap < 0:
@@ -88,12 +108,15 @@ def chunk_text(text: str, chunk_size: int = 512, chunk_overlap: int = 50) -> lis
     if chunk_overlap >= chunk_size:
         raise ValueError("chunk_overlap must be smaller than chunk_size")
 
+    # 先清理Markdown标记再分块
+    cleaned_text = _clean_markdown(text)
+
     chunks: list[str] = []
     start = 0
-    length = len(text)
+    length = len(cleaned_text)
     while start < length:
         end = min(start + chunk_size, length)
-        chunk = text[start:end].strip()
+        chunk = cleaned_text[start:end].strip()
         if chunk:
             chunks.append(chunk)
         if end >= length:
@@ -149,9 +172,10 @@ def _get_collection(reset_collection: bool = False):
     return client.get_or_create_collection(
         name=CHROMA_COLLECTION_NAME,
         metadata={
-            "description": "Thailand VAT regulations index",
+            "description": settings.chroma_meta.description,
             "embedding_model": settings.llm.embedding_model,
-            "language": "zh",
+            "language": settings.chroma_meta.language,
+            "hnsw:space": settings.chroma_meta.similarity_space,
         },
     )
 
@@ -167,10 +191,12 @@ def _embed_batch(texts: list[str]) -> list[list[float]]:
 
 def load_regulations(
     source_dir: Path = REGULATIONS_DIR,
-    chunk_size: int = 512,
-    chunk_overlap: int = 50,
+    chunk_size: int | None = None,
+    chunk_overlap: int | None = None,
     reset_collection: bool = False,
 ) -> dict[str, Any]:
+    chunk_size = chunk_size if chunk_size is not None else settings.rag.chunk_size
+    chunk_overlap = chunk_overlap if chunk_overlap is not None else settings.rag.chunk_overlap
     if not source_dir.exists():
         raise FileNotFoundError(f"Regulations directory not found: {source_dir}")
 
