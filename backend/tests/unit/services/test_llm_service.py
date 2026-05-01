@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import pytest
 
 from tax_compliance_radar.models.schemas import AuditRequest
-from tax_compliance_radar.services import llm_service
+from tax_compliance_radar.services import llm_service, embedding_service
 
 
 @dataclass
@@ -76,10 +76,10 @@ def test_generate_audit_report_uses_test_settings(monkeypatch, test_settings):
 
 def test_embed_text_uses_test_client(monkeypatch, test_settings):
     client = FakeGenerateClient(response="{}")
-    monkeypatch.setattr(llm_service, "_client", lambda: client)
-    monkeypatch.setattr(llm_service, "settings", test_settings)
+    monkeypatch.setattr(embedding_service, "_client", lambda: client)
+    monkeypatch.setattr(embedding_service, "settings", test_settings)
 
-    vector = llm_service.embed_text("hello")
+    vector = embedding_service.embed_text("hello")
 
     assert vector == [0.1, 0.2, 0.3]
     assert client.embed_kwargs["model"] == "qwen3-embedding:0.6b"
