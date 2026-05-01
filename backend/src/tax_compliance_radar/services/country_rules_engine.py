@@ -40,13 +40,14 @@ class ComplianceRule:
             触发的风险项，如未触发则返回 None
         """
         try:
-            # 准备 eval 环境变量
+            # 准备 eval 环境变量 - 自动注入所有业务数据字段（支持扩展）
             eval_globals = {
-                "business_type": business_data.get("business_type", ""),
-                "annual_sales": business_data.get("annual_sales", 0),
-                "platforms": business_data.get("platforms", []),
                 "registration_threshold": config.registration_threshold,
             }
+
+            # 自动注入所有业务数据字段 - 无需硬编码，支持新维度自动扩展
+            for key, value in business_data.items():
+                eval_globals[key] = value
 
             # 执行条件判断
             result = eval(self.condition, eval_globals)
