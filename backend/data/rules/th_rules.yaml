@@ -1,0 +1,64 @@
+# 泰国 VAT 合规规则配置
+country_code: TH
+country_name: 泰国
+version: 1.0
+description: 泰国跨境电商 VAT 合规审核规则
+
+# 审核规则列表
+rules:
+  - rule_id: TH_R001
+    description: 外国企业跨境电商VAT注册义务
+    category: registration
+    condition: business_type in ['跨境电商零售', '品牌出海直营']
+    risk_template:
+      risk_level: 高风险
+      risk_desc: 外国企业在泰国开展跨境电商业务无注册门槛，第一笔交易前应完成VAT注册
+      trigger_condition: 开展泰国跨境电商业务，无论销售额多少
+      regulation_base: 泰国VAT注册规则与2026年新政要求
+      violation_consequence: 未按时注册可能面临罚款、货物被扣、平台账户受限等风险
+
+  - rule_id: TH_R002
+    description: 平台代收代缴场景税务要求
+    category: platform
+    condition: len(platforms) > 0
+    risk_template:
+      risk_level: 中风险
+      risk_desc: 平台代收代缴场景下，商家仍需承担申报义务并留存完整交易数据
+      trigger_condition: "入驻以下平台销售: {}"
+      regulation_base: 泰国平台代收代缴管理办法
+      violation_consequence: 资料缺失可能导致税费申报延误或补缴滞纳金
+
+  - rule_id: TH_R003
+    description: 2026年取消低值商品免税政策
+    category: reporting
+    condition: "True"  # 始终触发
+    risk_template:
+      risk_level: 中风险
+      risk_desc: 2026年1月起取消1500泰铢低值商品免税政策，所有跨境商品均需缴纳7% VAT
+      trigger_condition: 跨境销售商品至泰国，无论订单金额大小
+      regulation_base: 泰国2026年VAT新政第3/2025号公告
+      violation_consequence: 低估税费可能导致货物清关延误或产生额外罚款
+
+  - rule_id: TH_R004
+    description: 大额销售企业合规要求
+    category: reporting
+    condition: annual_sales >= registration_threshold
+    risk_template:
+      risk_level: 高风险
+      risk_desc: "年销售额超过{registration_threshold:,}泰铢的企业需进行月度申报并接受年度审计"
+      trigger_condition: 年预估销售额达到申报阈值
+      regulation_base: 泰国增值税法第82/1条
+      violation_consequence: 未按要求申报可能产生高额罚款并影响企业信用
+
+# 默认建议列表
+suggestions:
+  - type: general
+    content: 在开展泰国业务前完成VAT注册准备工作
+  - type: general
+    content: 聘请当地税务代理处理月度申报事宜
+  - type: general
+    content: 留存所有平台订单数据和申报凭证至少5年
+  - type: general
+    content: 每季度进行一次合规自查，确保申报数据准确
+  - type: general
+    content: 关注泰国税务厅2026年VAT新政的最新更新

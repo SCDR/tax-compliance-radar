@@ -1,0 +1,23 @@
+# 越南 VAT 合规规则配置
+country_code: VN
+country_name: 越南
+version: 1.0
+description: 越南跨境电商 VAT 合规审核规则
+
+# 审核规则列表
+rules:
+  - rule_id: VN_R001
+    description: 越南跨境电商VAT申报要求
+    category: registration
+    condition: business_type in ['跨境电商零售', '品牌出海直营']
+    risk_template:
+      risk_level: 中风险
+      risk_desc: 越南对跨境电商实施新的VAT申报要求，需按季度申报
+      trigger_condition: 开展越南跨境电商业务
+      regulation_base: 越南VAT新政2025
+      violation_consequence: 未按时申报可能面临罚款
+
+# 默认建议列表
+suggestions:
+  - type: general
+    content: 建议了解越南最新跨境电商VAT申报流程
