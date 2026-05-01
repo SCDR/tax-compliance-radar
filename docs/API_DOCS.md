@@ -2,6 +2,8 @@
 
 ## 统一响应结构
 
+所有成功响应使用统一格式：
+
 ```json
 {
   "code": 200,
@@ -10,11 +12,53 @@
 }
 ```
 
+## 统一错误响应结构
+
+### 参数验证错误 (400)
+
+```json
+{
+  "code": 400,
+  "msg": "参数验证失败",
+  "error_type": "validation_error",
+  "details": [
+    {
+      "type": "value_error",
+      "loc": ["body", "selected_countries"],
+      "msg": "至少需要选择一个国家进行审核",
+      "ctx": {}
+    }
+  ]
+}
+```
+
 ---
 
-## 1. 问答接口（单国家）
+## 1. 健康检查接口
+
+### GET /api/v1/health
+
+检查服务状态。
+
+**响应**：
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "status": "ok"
+  }
+}
+```
+
+---
+
+## 2. 问答接口（单国家）
 
 ### POST /api/v1/qa/query
+
+提交税务合规问题，获取基于法规知识库的智能回答。
+
 **请求**：
 ```json
 {
@@ -22,19 +66,30 @@
 }
 ```
 
+**字段说明**：
+
+| 字段名 | 类型 | 必填 | 长度限制 | 说明 |
+|--------|------|------|----------|------|
+|`query_text`|string|✅|1-500字符|问题内容|
+
 ### GET /api/v1/qa/history
+
 获取问答历史列表。
 
 ### GET /api/v1/qa/history/{qa_id}
+
 获取单条问答详情。
 
 ---
 
-## 2. 审核接口
+## 3. 审核接口
 
-### 2.1 单国家审核（向后兼容）
+### 3.1 单国家审核（向后兼容）
 
 #### POST /api/v1/audit/submit
+
+提交单一国家的业务信息进行合规风险评估。
+
 **请求**：
 ```json
 {
@@ -45,17 +100,29 @@
 }
 ```
 
+**字段说明**：
+
+| 字段名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| `target_market` | string | ✅ | 目标市场，目前支持「泰国」 |
+| `business_type` | string | ✅ | 业务类型 |
+| `annual_sales` | number | ✅ | 年预计销售额（泰铢） |
+| `platforms` | Array[string] | ✅ | 入驻平台列表 |
+
 ### GET /api/v1/audit/history
+
 获取审核历史列表。
 
 ### GET /api/v1/audit/history/{audit_id}
+
 获取单条审核详情。
 
 ---
 
-### 2.2 多国组合审核 ✨
+### 3.2 多国组合审核 ✨
 
 #### POST /api/v1/multi/audit/submit
+
 同时审核多个国家/地区的合规风险。
 
 **请求**：
@@ -63,12 +130,8 @@
 {
   "selected_countries": ["TH", "VN"],
   "business_profile": {
-    // ===== 通用维度（所有国家共用）=====
     "business_type": "跨境电商零售",
-    "company_size": "中型企业",
-    "industry": "3C电子产品",
 
-    // ===== 多国维度（每个国家可不同）=====
     "annual_sales_by_country": {
       "TH": 5000000,
       "VN": 300000000
@@ -92,10 +155,6 @@
     "has_local_entity_by_country": {
       "TH": false,
       "VN": true
-    },
-    "employee_count_by_country": {
-      "TH": 50,
-      "VN": 30
     }
   }
 }
@@ -105,15 +164,13 @@
 
 | 字段名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| `selected_countries` | Array[string] | ✅ | 要审核的国家代码列表 |
-| `business_type` | string | ✅ | 业务类型 |
-| `company_size` | string | ➖ | 企业规模 |
-| `industry` | string | ➖ | 所属行业 |
+| `selected_countries` | Array[string] | ✅ | 要审核的国家代码列表，至少1个 |
+| `business_type` | string | ✅ | 业务类型，所有国家共用 |
 | `*_by_country` | object | ➖ | 按国家代码区分的业务维度 |
 
 > 💡 **可选维度说明**：所有 `*_by_country` 字段都是可选的。
 > - 未传递的字段将自动使用配置的默认值
-> - 默认值配置见 `backend/src/tax_compliance_radar/field_config.py`
+> - 数值字段验证：`annual_sales_by_country` ≥ 0，`monthly_orders_by_country` ≥ 0
 
 **响应**：
 ```json
@@ -165,21 +222,18 @@
         "suggestions": []
       }
     },
-    "all_risks": [
-      // 所有国家的风险混合列表（保留来源标签）
-    ],
-    "all_suggestions": [
-      // 所有国家的建议混合列表（保留来源标签）
-    ]
+    "all_risks": [],
+    "all_suggestions": []
   }
 }
 ```
 
 ---
 
-## 3. 国家元数据接口 ✨
+## 4. 国家元数据接口 ✨
 
 ### GET /api/v1/countries
+
 获取所有支持的国家/地区列表。
 
 **响应**：
@@ -204,17 +258,9 @@
 }
 ```
 
----
+### GET /api/v1/countries/{country_code}
 
-## 4. 健康检查
-
-### GET /api/v1/health
-返回：
-```json
-{
-  "status": "ok"
-}
-```
+获取指定国家的详细信息。
 
 ---
 
@@ -224,3 +270,14 @@
 |------|----------|------|
 | TH | 泰国 | VAT |
 | VN | 越南 | VAT |
+
+---
+
+## 附录：HTTP 状态码
+
+| 状态码 | 说明 |
+|--------|------|
+| 200 | 请求成功 |
+| 400 | 参数验证失败 |
+| 404 | 资源不存在 |
+| 500 | 服务器内部错误 |
