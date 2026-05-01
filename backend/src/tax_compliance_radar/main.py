@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from tax_compliance_radar.api.audit_router import router as audit_router
 from tax_compliance_radar.api.qa_router import router as qa_router
+from tax_compliance_radar.api.countries_router import router as countries_router
+from tax_compliance_radar.api.multi_audit_router import router as multi_audit_router
 from tax_compliance_radar.config import settings
 from tax_compliance_radar.services.db import initialize_database
 
@@ -29,3 +31,5 @@ def health() -> dict[str, str]:
 
 app.include_router(qa_router)
 app.include_router(audit_router)
+app.include_router(countries_router)
+app.include_router(multi_audit_router)
