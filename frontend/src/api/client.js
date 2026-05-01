@@ -24,3 +24,14 @@ export async function fetchAuditHistory() {
   const { data } = await api.get('/audit/history')
   return data
 }
+
+// 多国家API
+export async function fetchCountries() {
+  const { data } = await api.get('/countries')
+  return data
+}
+
+export async function submitMultiAudit(payload) {
+  const { data } = await api.post('/multi/audit/submit', payload)
+  return data
+}
