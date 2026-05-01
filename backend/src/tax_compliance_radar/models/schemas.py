@@ -66,10 +66,40 @@ class MultiCountryAuditReport(BaseModel):
 
 
 class BusinessProfile(BaseModel):
-    """跨国家通用的业务信息"""
+    """跨国家通用的业务信息
+
+    🌟 可扩展设计：
+    - 新增业务维度只需添加 "xxx_by_country" 模式的字段
+    - 自动流入规则引擎和AI检测，无需修改核心逻辑
+    """
+    # ===== 基础业务维度 =====
     business_type: str
-    annual_sales_by_country: Dict[str, int]  # 按国家区分销售额
-    platforms_by_country: Dict[str, List[str]]  # 按国家区分平台
+    annual_sales_by_country: Dict[str, int] = Field(
+        default_factory=dict,
+        description="按国家区分的年销售额"
+    )
+    platforms_by_country: Dict[str, List[str]] = Field(
+        default_factory=dict,
+        description="按国家区分的入驻平台"
+    )
+
+    # ===== 扩展业务维度（示例）=====
+    product_categories_by_country: Dict[str, List[str]] = Field(
+        default_factory=dict,
+        description="按国家区分的商品类目：{'TH': ['电子产品', '服饰']}"
+    )
+    monthly_orders_by_country: Dict[str, int] = Field(
+        default_factory=dict,
+        description="按国家区分的月均订单量"
+    )
+    warehousing_mode_by_country: Dict[str, str] = Field(
+        default_factory=dict,
+        description="按国家区分的仓储模式：本地仓/海外仓/直邮"
+    )
+    has_local_entity_by_country: Dict[str, bool] = Field(
+        default_factory=dict,
+        description="按国家区分是否有本地公司主体"
+    )
 
 
 class MultiCountryAuditRequest(BaseModel):
