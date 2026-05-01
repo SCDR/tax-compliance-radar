@@ -16,18 +16,44 @@ from tax_compliance_radar.services.llm_service import _chat_with_fallback, _acha
 from tax_compliance_radar.registry import CountryRegistry
 
 
+# ==================== 配置与常量 ====================
+
+# 字段友好名称映射（支持扩展）
+_FIELD_FRIENDLY_NAMES = {
+    "business_type": "业务类型",
+    "annual_sales": "年销售额",
+    "platforms": "入驻平台",
+    "product_categories": "商品类目",
+    "monthly_orders": "月订单量",
+    "warehousing_mode": "仓储模式",
+    "has_local_entity": "本地公司主体",
+    "employee_count": "员工数量",
+}
+
+# 特殊格式处理的字段
+_SPECIAL_FORMAT_FIELDS = {
+    "annual_sales",  # 需要加货币符号
+}
+
+
 # ==================== 缓存机制 ====================
 _risk_cache: Dict[str, List[SourcedRiskItem]] = {}
 
 
 def _get_cache_key(country_code: str, business_data: Dict[str, Any]) -> str:
-    """生成缓存键"""
-    key_data = {
-        "country": country_code,
-        "business_type": business_data.get("business_type"),
-        "annual_sales": business_data.get("annual_sales"),
-        "platforms": sorted(business_data.get("platforms", [])),
-    }
+    """生成缓存键 - 自动包含所有业务维度
+
+    🌟 自动扩展：新增业务维度无需修改此函数
+    """
+    key_data: Dict[str, Any] = {"country": country_code}
+
+    # 自动遍历所有业务字段添加到缓存键
+    for key, value in sorted(business_data.items()):
+        if isinstance(value, list):
+            key_data[key] = sorted(value) if value else []
+        else:
+            key_data[key] = value
+
     key_str = str(sorted(key_data.items()))
     return f"risk_detection:{hashlib.md5(key_str.encode()).hexdigest()}"
 
@@ -64,14 +90,53 @@ JSON_TEMPLATE = """
 
 
 def get_risk_detection_prompt(country_code: str, business_data: Dict[str, Any]) -> str:
-    """获取指定国家的风险检测提示词"""
+    """获取指定国家的风险检测提示词
+
+    🌟 自动扩展能力：
+    - 自动格式化所有业务维度字段到提示词
+    - 新增业务维度无需修改此函数
+    - 自动处理列表、布尔值等特殊类型
+    """
     config = CountryRegistry.get(country_code)
     currency_symbol = config.currency_symbol
 
-    platforms_str = ", ".join(business_data.get("platforms", [])) or "无"
+    # ===== 自动格式化所有业务维度（无需硬编码）=====
+    business_info_lines = []
+    for key, value in business_data.items():
+        # 跳过空值
+        if value is None or value == "" or value == []:
+            continue
+
+        # 获取友好名称
+        friendly_name = _FIELD_FRIENDLY_NAMES.get(key, key)
+
+        # 特殊格式处理
+        if key in _SPECIAL_FORMAT_FIELDS:
+            if key == "annual_sales":
+                display_value = f"{value:,} {currency_symbol}"
+            else:
+                display_value = str(value)
+        elif isinstance(value, list):
+            display_value = ", ".join(str(v) for v in value) or "无"
+        elif isinstance(value, bool):
+            display_value = "是" if value else "否"
+        else:
+            display_value = str(value)
+
+        business_info_lines.append(f"{friendly_name}：{display_value}")
+
+    business_info_block = "\n".join(business_info_lines)
+
+    # 构建检索查询（使用主要字段）
+    query_parts = [
+        str(business_data.get("business_type", "")),
+        str(business_data.get("product_categories", "")),
+        f"{business_data.get('annual_sales', 0)}",
+        "VAT 风险"
+    ]
+    query = " ".join([p for p in query_parts if p])
 
     # 构建法规上下文
-    query = f"{business_data.get('business_type', '')} {business_data.get('annual_sales', 0)} VAT 风险"
     retrieval_result = search_regulations(query, top_k=3)
 
     if retrieval_result.below_threshold or not retrieval_result.documents:
@@ -88,13 +153,12 @@ def get_risk_detection_prompt(country_code: str, business_data: Dict[str, Any]) 
 【任务说明】
 - 基于业务数据和检索到的相关法规
 - 识别规则引擎可能遗漏的边缘场景风险
+- 特别关注商品类目、仓储模式、订单规模等特殊场景
 - 只添加与业务场景直接相关的真实风险
 - 如果没有发现额外风险，返回空数组
 
-【输入】
-业务类型：{business_data.get('business_type', '')}
-年销售额：{business_data.get('annual_sales', 0)} {currency_symbol}
-入驻平台：{platforms_str}
+【业务信息】
+{business_info_block}
 
 【相关法规检索结果】
 {regulation_context}
@@ -107,6 +171,7 @@ def get_risk_detection_prompt(country_code: str, business_data: Dict[str, Any]) 
 - 如果没有发现额外风险，输出空数组 []
 - 风险等级只能是"低风险"（AI识别的为潜在风险，确定性风险由规则引擎处理）
 - 所有风险必须与{config.country_name}税务合规相关
+- 特别关注商品类目对应的认证要求、仓储模式对应的税务义务
 """.strip()
 
 

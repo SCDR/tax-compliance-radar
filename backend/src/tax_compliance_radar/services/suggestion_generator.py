@@ -11,6 +11,24 @@ from tax_compliance_radar.services.retrieval_service import search_regulations
 from tax_compliance_radar.registry import CountryRegistry
 
 
+# 字段友好名称映射（与 ai_risk_detector.py 保持一致）
+_FIELD_FRIENDLY_NAMES = {
+    "business_type": "业务类型",
+    "annual_sales": "年销售额",
+    "platforms": "入驻平台",
+    "product_categories": "商品类目",
+    "monthly_orders": "月订单量",
+    "warehousing_mode": "仓储模式",
+    "has_local_entity": "本地公司主体",
+    "employee_count": "员工数量",
+}
+
+# 特殊格式处理的字段
+_SPECIAL_FORMAT_FIELDS = {
+    "annual_sales",  # 需要加货币符号
+}
+
+
 def get_suggestion_prompt_template(country_code: str) -> str:
     """获取指定国家的建议生成提示词"""
     config = CountryRegistry.get(country_code)
@@ -73,11 +91,36 @@ async def generate_enhanced_suggestions_async(
     # 构建风险描述
     risk_summary = "\n".join([f"- {r.risk_level}: {r.risk_desc}" for r in risks])
 
+    # ===== 自动格式化所有业务维度（无需硬编码）=====
+    business_info_lines = []
+    for key, value in business_data.items():
+        # 跳过空值
+        if value is None or value == "" or value == []:
+            continue
+
+        # 获取友好名称
+        friendly_name = _FIELD_FRIENDLY_NAMES.get(key, key)
+
+        # 特殊格式处理
+        if key in _SPECIAL_FORMAT_FIELDS:
+            if key == "annual_sales":
+                display_value = f"{value:,} {config.currency_symbol}"
+            else:
+                display_value = str(value)
+        elif isinstance(value, list):
+            display_value = ", ".join(str(v) for v in value) or "无"
+        elif isinstance(value, bool):
+            display_value = "是" if value else "否"
+        else:
+            display_value = str(value)
+
+        business_info_lines.append(f"{friendly_name}: {display_value}")
+
+    business_info_block = "\n".join(business_info_lines)
+
     user_prompt = f"""
 【业务信息】
-业务类型: {business_data.get('business_type', '')}
-年销售额: {business_data.get('annual_sales', 0)} {config.currency_symbol}
-入驻平台: {', '.join(business_data.get('platforms', [])) or '无'}
+{business_info_block}
 
 【已识别风险】
 {risk_summary}
@@ -85,7 +128,7 @@ async def generate_enhanced_suggestions_async(
 【检索到的相关法规】
 {regulation_context}
 
-请基于以上信息生成合规建议。
+请基于以上信息生成合规建议，特别关注商品类目、仓储模式等特殊场景的合规要求。
 """
 
     try:
