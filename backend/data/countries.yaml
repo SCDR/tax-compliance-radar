@@ -1,0 +1,218 @@
+countries:
+- code: TH
+  name: 泰国
+  currency: THB
+  currency_symbol: 泰铢
+  tax_type: VAT
+  tax_rate: 7.0
+  registration_threshold: 1800000
+  language: zh
+  business_types:
+  - 跨境电商零售
+  - 品牌出海直营
+  - 外贸综合服务
+  platforms:
+  - Shopee
+  - Lazada
+  - TikTok Shop
+  business_fields:
+  - name: annual_sales
+    label: 年预计销售额
+    type: number
+    required: true
+    placeholder: 请输入年销售额（泰铢）
+    min_value: 0
+    max_value: 1000000000000
+  - name: platforms
+    label: 入驻平台
+    type: multiselect
+    options:
+    - Shopee
+    - Lazada
+    - TikTok Shop
+  - name: product_categories
+    label: 商品类目
+    type: multiselect
+    options:
+    - 电子产品
+    - 服饰
+    - 美妆
+    - 家居
+    - 食品
+  - name: monthly_orders
+    label: 月均订单量
+    type: number
+    placeholder: 请输入月均订单量
+    min_value: 0
+  - name: warehousing_mode
+    label: 仓储模式
+    type: select
+    options:
+    - 本地仓
+    - 海外仓
+    - 直邮
+  - name: has_local_entity
+    label: 是否有本地公司主体
+    type: select
+    options:
+    - 是
+    - 否
+  flag: 🇹🇭
+- code: VN
+  name: 越南
+  currency: VND
+  currency_symbol: 越南盾
+  tax_type: VAT
+  tax_rate: 10.0
+  registration_threshold: 200000000
+  language: zh
+  business_types:
+  - 跨境电商零售
+  - 品牌出海直营
+  platforms:
+  - Shopee
+  - Lazada
+  - TikTok Shop
+  - Sendo
+  business_fields:
+  - name: annual_sales
+    label: 年预计销售额
+    type: number
+    required: true
+    placeholder: 请输入年销售额（越南盾）
+    min_value: 0
+    max_value: 1000000000000
+  - name: platforms
+    label: 入驻平台
+    type: multiselect
+    options:
+    - Shopee
+    - Lazada
+    - TikTok Shop
+    - Sendo
+  - name: product_categories
+    label: 商品类目
+    type: multiselect
+    options:
+    - 电子产品
+    - 服饰
+    - 美妆
+    - 家居
+  - name: monthly_orders
+    label: 月均订单量
+    type: number
+    placeholder: 请输入月均订单量
+    min_value: 0
+  - name: warehousing_mode
+    label: 仓储模式
+    type: select
+    options:
+    - 本地仓
+    - 海外仓
+    - 直邮
+  flag: 🇻🇳
+- code: MY
+  name: 马来西亚
+  currency: MYR
+  currency_symbol: 林吉特
+  tax_type: VAT/SST
+  tax_rate: 6.0
+  registration_threshold: 500000
+  language: zh
+  business_types:
+  - 跨境电商零售
+  - 品牌出海直营
+  platforms:
+  - Shopee
+  - Lazada
+  - TikTok Shop
+  business_fields:
+  - name: annual_sales
+    label: 年预计销售额
+    type: number
+    required: true
+    placeholder: 请输入年销售额（林吉特）
+    min_value: 0
+    max_value: 1000000000000
+  - name: platforms
+    label: 入驻平台
+    type: multiselect
+    options:
+    - Shopee
+    - Lazada
+    - TikTok Shop
+  - name: product_categories
+    label: 商品类目
+    type: multiselect
+    options:
+    - 电子产品
+    - 服饰
+    - 美妆
+  - name: warehousing_mode
+    label: 仓储模式
+    type: select
+    options:
+    - 本地仓
+    - 海外仓
+    - 直邮
+  - name: has_local_entity
+    label: 是否有本地公司主体
+    type: select
+    options:
+    - 是
+    - 否
+  flag: 🇲🇾
+- code: ID
+  name: 印度尼西亚
+  currency: IDR
+  currency_symbol: 印尼盾
+  tax_type: PPh
+  tax_rate: 11.0
+  registration_threshold: 4800000000
+  language: zh
+  flag: 🇮🇩
+  business_types:
+  - 跨境电商零售
+  - 本地仓配
+  platforms:
+  - Shopee
+  - Tokopedia
+  - Lazada
+  business_fields:
+  - name: annual_sales
+    label: 年预计销售额
+    type: number
+    required: true
+    placeholder: 请输入年销售额（印尼盾）
+    min_value: 0
+    max_value: 1000000000000
+  - name: local_partner_type
+    label: 本地合作方类型
+    type: select
+    options:
+    - 本地公司
+    - 授权代理
+    - 电商平台
+    - 第三方服务
+  - name: import_license
+    label: 进口许可证类型
+    type: select
+    options:
+    - API
+    - NPIK
+    - 无
+  - name: warehouse_location
+    label: 仓库位置
+    type: multiselect
+    options:
+    - 雅加达
+    - 泗水
+    - 万隆
+    - 境外直邮
+  - name: has_npwp
+    label: 是否有税号 NPWP
+    type: select
+    options:
+    - 是
+    - 否
+    - 办理中

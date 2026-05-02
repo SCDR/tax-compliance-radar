@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal, List, Dict
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 # ==================== 来源标签系统 ====================
@@ -69,73 +69,88 @@ class MultiCountryAuditReport(BaseModel):
 class BusinessProfile(BaseModel):
     """跨国家通用的业务信息
 
-    🌟 可扩展设计：
-    - 新增业务维度只需添加 "xxx_by_country" 模式的字段
-    - 自动流入规则引擎和AI检测，无需修改核心逻辑
+    🌟 完全动态设计：
+    - 所有业务字段从 YAML 配置自动加载
+    - 新增字段只需修改 countries.yaml，无需修改代码
+    - 自动根据配置进行类型校验和范围校验
     """
-    # ===== 基础业务维度 =====
-    business_type: str
-    annual_sales_by_country: Dict[str, int] = Field(
-        default_factory=dict,
-        description="按国家区分的年销售额"
-    )
-    platforms_by_country: Dict[str, List[str]] = Field(
-        default_factory=dict,
-        description="按国家区分的入驻平台"
-    )
+    business_type: str = Field(description="业务类型")
 
-    # ===== 扩展业务维度（示例）=====
-    product_categories_by_country: Dict[str, List[str]] = Field(
-        default_factory=dict,
-        description="按国家区分的商品类目：{'TH': ['电子产品', '服饰']}"
-    )
-    monthly_orders_by_country: Dict[str, int] = Field(
-        default_factory=dict,
-        description="按国家区分的月均订单量"
-    )
-    warehousing_mode_by_country: Dict[str, str] = Field(
-        default_factory=dict,
-        description="按国家区分的仓储模式：本地仓/海外仓/直邮"
-    )
-    has_local_entity_by_country: Dict[str, bool] = Field(
-        default_factory=dict,
-        description="按国家区分是否有本地公司主体"
-    )
+    # 动态字段通过 model_extra 接收，然后在根验证器中统一处理
+    model_config = {"extra": "allow"}
 
-    @field_validator("annual_sales_by_country")
-    @classmethod
-    def validate_annual_sales(cls, v: Dict[str, int]) -> Dict[str, int]:
-        """验证每个国家的年销售额非负且不超过上限"""
-        for country, value in v.items():
-            if value < 0:
-                raise ValueError(f"国家 {country} 的年销售额不能为负数")
-            if value > 1000000000000:  # 1万亿
-                raise ValueError(f"国家 {country} 的年销售额超过上限")
-        return v
+    @model_validator(mode="after")
+    def validate_dynamic_fields(self) -> "BusinessProfile":
+        """根据 YAML 配置动态验证所有业务字段"""
+        from tax_compliance_radar.registry import CountryRegistry
 
-    @field_validator("monthly_orders_by_country")
-    @classmethod
-    def validate_monthly_orders(cls, v: Dict[str, int]) -> Dict[str, int]:
-        """验证每个国家的月订单量非负"""
-        for country, value in v.items():
-            if value < 0:
-                raise ValueError(f"国家 {country} 的月订单量不能为负数")
-            if value > 100000000:  # 1亿
-                raise ValueError(f"国家 {country} 的月订单量超过上限")
-        return v
+        # 获取所有国家配置中的字段元数据（用于友好错误提示）
+        field_meta = {}
+        all_configs = CountryRegistry.get_all_configs()
+        for config in all_configs.values():
+            for field in config.business_fields:
+                if field.name not in field_meta:
+                    field_meta[field.name] = {
+                        "label": field.label,
+                        "type": field.type,
+                        "required": field.required,
+                        "options": field.options,
+                    }
+
+        all_field_names = list(field_meta.keys())
+        expected_suffix = "_by_country"
+        errors = []
+
+        for field_name in list(self.model_dump().keys()):
+            if field_name.endswith(expected_suffix) and field_name != "business_type":
+                field_base_name = field_name[: -len(expected_suffix)]
+                field_value = self.model_dump()[field_name]
+
+                if field_base_name in all_field_names:
+                    # 根据字段类型做基础校验
+                    meta = field_meta[field_base_name]
+                    friendly_name = meta["label"]
+
+                    # number 类型校验
+                    if meta["type"] == "number" and isinstance(field_value, dict):
+                        for country_code, value in field_value.items():
+                            if value is not None:
+                                if not isinstance(value, (int, float)):
+                                    errors.append(
+                                        f"{friendly_name} ({country_code}) 应为有效数字"
+                                    )
+                                elif isinstance(value, int) and abs(value) > 9007199254740991:
+                                    errors.append(
+                                        f"{friendly_name} ({country_code}) 数值过大，可能导致精度丢失，请减小数值"
+                                    )
+
+        if errors:
+            raise ValueError("; ".join(errors))
+
+        return self
 
 
 class MultiCountryAuditRequest(BaseModel):
     """多国组合审核请求"""
     selected_countries: List[str]  # ["TH", "VN", "MY"]
     business_profile: BusinessProfile
+    think_mode: bool = Field(False, description="思考模式：开启后会进行更深入的分析")
 
     @field_validator("selected_countries")
     @classmethod
     def validate_selected_countries(cls, v: List[str]) -> List[str]:
         """验证至少选择一个国家"""
+        from tax_compliance_radar.registry import CountryRegistry
+
         if not v or len(v) == 0:
             raise ValueError("至少需要选择一个国家进行审核")
+
+        # 验证国家代码是否有效
+        supported_codes = CountryRegistry.get_all_configs().keys()
+        invalid_codes = [code for code in v if code not in supported_codes]
+        if invalid_codes:
+            raise ValueError(f"不支持的国家代码: {', '.join(invalid_codes)}。支持的国家: {', '.join(supported_codes)}")
+
         return v
 
 
@@ -165,6 +180,7 @@ class ApiResponse(BaseModel):
 
 class QAQueryRequest(BaseModel):
     query_text: str = Field(..., min_length=1, max_length=500)
+    think_mode: bool = Field(False, description="思考模式：开启后会进行更深入的分析")
 
 
 class QAAnswer(BaseModel):
