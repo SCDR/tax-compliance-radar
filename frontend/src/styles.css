@@ -1,10 +1,24 @@
+/* ========== 科技感主题变量 ========== */
 :root {
+  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(102, 126, 234, 0.15);
+  --neon-blue: #00d4ff;
+  --neon-purple: #a855f7;
+  --glow-shadow: 0 0 20px rgba(102, 126, 234, 0.4);
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
+
   color-scheme: light;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background:
-    radial-gradient(circle at top left, rgba(16, 163, 127, 0.18), transparent 30%),
-    radial-gradient(circle at top right, rgba(0, 0, 0, 0.08), transparent 26%),
-    linear-gradient(180deg, #f6f8fb 0%, #eef3f8 100%);
+    radial-gradient(circle at 0% 0%, rgba(102, 126, 234, 0.4) 0%, transparent 55%),
+    radial-gradient(circle at 100% 0%, rgba(118, 75, 162, 0.32) 0%, transparent 50%),
+    radial-gradient(circle at 100% 100%, rgba(0, 212, 255, 0.22) 0%, transparent 45%),
+    radial-gradient(circle at 0% 100%, rgba(168, 85, 247, 0.18) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(102, 126, 234, 0.08) 0%, transparent 60%),
+    linear-gradient(180deg, #edf4ff 0%, #e6f0ff 35%, #f0efff 70%, #f8f5ff 100%);
+  background-attachment: fixed;
 }
 
 html,
@@ -18,9 +32,327 @@ body {
   background: transparent;
 }
 
+/* ========== 玻璃拟态 Card ========== */
+.ant-card.tech-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.06);
+  transition: all var(--transition-normal);
+}
+
+.ant-card.tech-card:hover {
+  border-color: rgba(102, 126, 234, 0.3);
+  box-shadow: 0 12px 40px rgba(102, 126, 234, 0.12);
+}
+
+/* ========== 渐变 Button ========== */
+.ant-btn.tech-btn-primary {
+  background: var(--primary-gradient);
+  border: none;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  transition: all var(--transition-normal);
+}
+
+.ant-btn.tech-btn-primary:hover {
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+  transform: translateY(-1px);
+}
+
+.ant-btn.tech-btn-primary:active {
+  transform: translateY(0);
+}
+
+/* ========== Input 聚焦发光 ========== */
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused,
+.ant-input:focus,
+.ant-input-focused {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+
+.ant-input-affix-wrapper:hover,
+.ant-input:hover {
+  border-color: rgba(102, 126, 234, 0.6);
+}
+
+/* ========== Tabs 选中高亮 ========== */
+.ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 600;
+}
+
+.ant-tabs .ant-tabs-ink-bar {
+  background: var(--primary-gradient);
+  height: 3px;
+  border-radius: 2px;
+}
+
+.ant-tabs .ant-tabs-tab:hover {
+  color: #667eea;
+}
+
+/* ========== Select 下拉效果 ========== */
+.ant-select-dropdown .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  color: #667eea;
+  font-weight: 500;
+}
+
+.ant-select-dropdown .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+  background: rgba(102, 126, 234, 0.06);
+}
+
+/* ========== Alert 渐变背景 ========== */
+.ant-alert-info {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border-color: rgba(102, 126, 234, 0.2);
+}
+
+.ant-alert-warning {
+  background: linear-gradient(135deg, rgba(250, 173, 20, 0.1) 0%, rgba(249, 115, 22, 0.06) 100%);
+  border-color: rgba(250, 173, 20, 0.3);
+}
+
+.ant-alert-error {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.06) 100%);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.ant-alert-success {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.06) 100%);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+/* ========== 思考指示器样式 ========== */
+.thinking-indicator {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 32px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.thinking-spin {
+  color: #667eea;
+}
+
+.thinking-text-wrapper {
+  flex: 1;
+  overflow: hidden;
+}
+
+.thinking-text {
+  font-size: 15px;
+  color: #4a5568;
+  font-weight: 500;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.thinking-text.fade-out {
+  opacity: 0;
+}
+
+.thinking-text.fade-in {
+  opacity: 1;
+}
+
+/* ========== 动画关键帧 ========== */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUpIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Tab内容入场动画 */
+.ant-tabs-tabpane-active .qa-tab-content,
+.ant-tabs-tabpane-active .audit-tab-content {
+  animation: tabFadeIn 300ms ease-out forwards;
+}
+
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 卡片级别的错落动画 */
+.ant-tabs-tabpane-active .tech-card {
+  animation: cardScaleIn 380ms ease-out forwards;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: opacity, transform;
+}
+
+@keyframes cardScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.99) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.ant-tabs-tabpane-active .tech-card:nth-child(1) { animation-delay: 0ms; }
+.ant-tabs-tabpane-active .tech-card:nth-child(2) { animation-delay: 60ms; }
+.ant-tabs-tabpane-active .tech-card:nth-child(3) { animation-delay: 120ms; }
+.ant-tabs-tabpane-active .tech-card:nth-child(4) { animation-delay: 180ms; }
+
+/* 防止动画重绘闪烁 */
+.ant-tabs-content-holder {
+  overflow: hidden;
+}
+
+/* 输入框容器动画 - 贝塞尔曲线平滑过渡 */
+.chat-input-wrapper {
+  opacity: 0;
+  transform: translateY(100%);
+  transition: opacity 800ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              transform 800ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+}
+
+.chat-input-wrapper.active {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+@keyframes streamStructuredLineIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(1px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes streamStructuredCharIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.audit-fade-block {
+  animation: fadeIn 320ms ease both;
+}
+
+.audit-section-card {
+  overflow: hidden;
+}
+
+.audit-country-card {
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.audit-country-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px rgba(102, 126, 234, 0.12);
+}
+
+.audit-list-item {
+  padding: 14px 0;
+}
+
+.audit-structure-root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@keyframes streamCharIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(1px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes typewriterBlink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.loading-icon {
+  animation: spin 1s linear infinite;
+}
+
+.pulse-dot {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ========== 应用布局 ========== */
 .app-shell {
   min-height: 100vh;
   padding: 32px;
+  background-image:
+    radial-gradient(circle at 20% 80%, rgba(102, 126, 234, 0.06) 0%, transparent 40%),
+    radial-gradient(circle at 80% 20%, rgba(118, 75, 162, 0.06) 0%, transparent 40%);
+  background-attachment: fixed;
 }
 
 .hero {
@@ -60,14 +392,140 @@ body {
   width: 100%;
 }
 
+/* 问答聊天布局 */
+/* 问答页面底部悬浮输入框 */
+.qa-tab-content {
+  min-height: calc(100vh - 180px);
+  padding-bottom: 220px;
+}
+
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chat-result-card {
+  min-height: 300px;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .qa-tab-content {
+    padding-bottom: 260px;
+  }
+}
+
+.question-label {
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  border-left: 4px solid #667eea;
+}
+
+/* 优化输入框样式 */
+.chat-input-card .ant-input {
+  border-radius: 12px;
+  border-color: rgba(102, 126, 234, 0.2);
+  transition: all 0.3s ease;
+}
+
+.chat-input-card .ant-input:focus,
+.chat-input-card .ant-input-focused {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
 .disclaimer-text {
-  color: #8a1f11;
-  background: #fff2ea;
-  border: 1px solid #ffd7c2;
+  color: #7c2d12;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  border: 1px solid #fed7aa;
   padding: 12px 14px;
   border-radius: 12px;
 }
 
+/* ========== 历史卡片样式 ========== */
+.history-card {
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.history-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+}
+
+.history-card-expand {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease;
+}
+
+.history-card-expand.expanded {
+  max-height: 1000px;
+}
+
+/* ========== PDF 导出按钮 ========== */
+.pdf-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ========== 打字机效果 ========== */
+.typewriter-wrapper {
+  position: relative;
+}
+
+.typewriter-cursor {
+  display: inline-block;
+  width: 3px;
+  height: 1.3em;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  margin-left: 4px;
+  vertical-align: text-bottom;
+  animation: typewriterBlink 0.8s infinite;
+  border-radius: 2px;
+}
+
+.stream-answer-block {
+  white-space: pre-wrap;
+  line-height: 1.8;
+  display: inline;
+}
+
+.stream-answer-char {
+  display: inline-block;
+  animation: streamCharIn 220ms ease both;
+  will-change: transform, opacity, filter;
+}
+
+.stream-answer-placeholder {
+  color: #999;
+}
+
+.stream-structured-root {
+  display: inline;
+  white-space: pre-wrap;
+}
+
+.stream-structured-line {
+  display: inline;
+  animation: streamStructuredLineIn 260ms ease both;
+}
+
+.stream-structured-char {
+  display: inline-block;
+  animation: streamStructuredCharIn 180ms ease both;
+  will-change: transform, opacity;
+}
+
+.stream-structured-placeholder {
+  color: #999;
+}
+
+/* ========== 响应式 ========== */
 @media (max-width: 960px) {
   .hero,
   .panel-grid {
@@ -77,5 +535,9 @@ body {
 
   .app-shell {
     padding: 16px;
+  }
+
+  .thinking-indicator {
+    padding: 16px 20px;
   }
 }
