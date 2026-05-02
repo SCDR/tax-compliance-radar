@@ -18,9 +18,19 @@ async def list_supported_countries() -> ApiResponse:
 
 @router.get("/{country_code}", response_model=ApiResponse)
 async def get_country_config(country_code: str) -> ApiResponse:
-    """获取特定国家的配置信息"""
+    """获取特定国家的配置信息（包含业务字段配置）"""
     try:
         config = CountryRegistry.get(country_code)
         return ApiResponse(data=config.to_dict())
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/config/all", response_model=ApiResponse)
+async def get_all_country_configs() -> ApiResponse:
+    """获取所有国家的完整配置（包含业务字段，用于前端动态表单渲染）"""
+    configs = CountryRegistry.get_all_configs()
+    result = {}
+    for code, config in configs.items():
+        result[code] = config.to_dict()
+    return ApiResponse(data=result)

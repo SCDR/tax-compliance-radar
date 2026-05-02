@@ -30,11 +30,17 @@ def list_history() -> ApiResponse:
     data = []
     for row in rows:
         business_info = json.loads(row["business_info"])
+        # 构建摘要标题，便于区分不同历史记录
+        countries = business_info.get("selected_countries", [])
+        countries_str = ", ".join(countries) if countries else "未指定国家"
+        summary_title = f"{business_info.get('business_type', '未知业务')} - {countries_str}"
+
         data.append(
             {
                 "audit_id": row["audit_id"],
                 "business_type": business_info.get("business_type", ""),
-                "annual_sales": business_info.get("annual_sales", 0),
+                "summary_title": summary_title,
+                "selected_countries": countries,
                 "risk_count": {
                     "high_risk": row["high_risk_count"],
                     "medium_risk": row["medium_risk_count"],
@@ -57,16 +63,17 @@ def get_history_detail(audit_id: int) -> ApiResponse:
         raise HTTPException(status_code=404, detail="审核记录不存在")
     business_info = json.loads(row["business_info"])
     audit_report = json.loads(row["audit_report"])
-    data = AuditData(
-        audit_id=row["audit_id"],
-        business_info=AuditRequest.model_validate(business_info),
-        audit_report=AuditReport.model_validate(audit_report),
-        risk_count=RiskCount(
-            high_risk=row["high_risk_count"],
-            medium_risk=row["medium_risk_count"],
-            low_risk=row["low_risk_count"],
-        ),
-        disclaimer="本工具仅供参考，不构成税务/法律意见，不替代专业顾问服务。",
-        create_time=row["create_time"],
-    )
+    # 简化返回，直接使用字典无需严格 schema 验证（兼容多国格式）
+    data = {
+        "audit_id": row["audit_id"],
+        "business_info": business_info,
+        "audit_report": audit_report,
+        "risk_count": {
+            "high_risk": row["high_risk_count"],
+            "medium_risk": row["medium_risk_count"],
+            "low_risk": row["low_risk_count"],
+        },
+        "disclaimer": "本工具仅供参考，不构成税务/法律意见，不替代专业顾问服务。",
+        "create_time": row["create_time"],
+    }
     return ApiResponse(data=data)
