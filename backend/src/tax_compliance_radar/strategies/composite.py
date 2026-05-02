@@ -24,6 +24,7 @@ from tax_compliance_radar.services.ai_risk_detector import (
 )
 from tax_compliance_radar.services.suggestion_generator import generate_enhanced_suggestions_async
 from tax_compliance_radar.field_config import get_field_default
+from tax_compliance_radar.config import settings
 
 
 class MultiCountryAuditStrategy:
@@ -166,6 +167,7 @@ class MultiCountryAuditStrategy:
             results_by_country=results_by_country,
             all_risks=all_risks,
             all_suggestions=all_suggestions,
+            disclaimer=settings.disclaimer_text,
         )
 
     def _extract_country_business(
@@ -173,58 +175,42 @@ class MultiCountryAuditStrategy:
     ) -> Dict[str, Any]:
         """从全局业务信息中提取特定国家的业务信息
 
-        🌟 自动扩展能力：
-        1. 自动识别通用维度（非按国家区分）
+        🌟 完全动态字段支持：
+        1. 使用 model_dump() 获取所有字段（包括动态字段）
         2. 自动识别 "xxx_by_country" 模式的多国维度
-        3. 新增业务维度无需修改此函数
-        4. 保留元数据：_field_set_flags 记录哪些字段被显式传递
-
-        🤝 向后兼容保证：
-        - 正常字段的值和行为完全不变
-        - 无需区分的场景完全可以忽略元数据字段
+        3. 新增业务字段只需修改 YAML 配置，无需修改代码
         """
         result: Dict[str, Any] = {}
-        # 🌟 元数据：记录每个字段是否被用户显式传递
-        # 特殊字段，以下划线开头，不会与业务字段名冲突
         field_set_flags: Dict[str, bool] = {}
 
-        # 反射遍历所有字段，自动提取所有业务维度
-        # 使用 BusinessProfile.model_fields 而非实例访问（Pydantic V2 规范）
-        for field_name, field_info in BusinessProfile.model_fields.items():
+        # 使用 model_dump() 获取所有字段，支持动态字段
+        profile_data = business_profile.model_dump()
+
+        for field_name, value in profile_data.items():
             # ============================================
             # 情况 A: 通用维度（没有 _by_country 后缀）
-            # 如: business_type, company_size, industry 等
             # ============================================
             if not field_name.endswith("_by_country"):
-                value = getattr(business_profile, field_name)
                 result[field_name] = value
-                # 通用维度：只要在模型中定义了就算已设置（通常都有默认值）
                 field_set_flags[field_name] = value is not None
                 continue
 
             # ============================================
             # 情况 B: 多国维度（有 _by_country 后缀）
-            # 如: annual_sales_by_country, platforms_by_country 等
             # ============================================
-            # 提取维度名："annual_sales_by_country" -> "annual_sales"
             dimension_name = field_name.replace("_by_country", "")
+            country_value = value.get(country_code) if isinstance(value, dict) else None
 
-            # 获取该国家的具体值
-            country_dict = getattr(business_profile, field_name)
-            value = country_dict.get(country_code)
+            # 记录元数据：是否被显式传递
+            field_set_flags[dimension_name] = country_value is not None
 
-            # 🌟 先记录元数据：是否被显式传递
-            field_set_flags[dimension_name] = value is not None
+            # 注入默认值
+            if country_value is None:
+                country_value = get_field_default(dimension_name)
 
-            # 🌟 再注入默认值（规则编写者永远不会看到 None）
-            if value is None:
-                value = get_field_default(dimension_name)
+            result[dimension_name] = country_value
 
-            result[dimension_name] = value
-
-        # 把元数据放入结果（特殊命名，不会与业务字段冲突）
         result["_field_set_flags"] = field_set_flags
-
         return result
 
     def _assess_registration(

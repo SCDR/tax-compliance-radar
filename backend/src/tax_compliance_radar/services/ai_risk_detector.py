@@ -18,22 +18,13 @@ from tax_compliance_radar.registry import CountryRegistry
 
 # ==================== 配置与常量 ====================
 
-# 字段友好名称映射（支持扩展）
-_FIELD_FRIENDLY_NAMES = {
-    "business_type": "业务类型",
-    "annual_sales": "年销售额",
-    "platforms": "入驻平台",
-    "product_categories": "商品类目",
-    "monthly_orders": "月订单量",
-    "warehousing_mode": "仓储模式",
-    "has_local_entity": "本地公司主体",
-    "employee_count": "员工数量",
-}
-
 # 特殊格式处理的字段
 _SPECIAL_FORMAT_FIELDS = {
     "annual_sales",  # 需要加货币符号
 }
+
+# 元数据字段，不传递给 LLM
+_METADATA_FIELDS = {"_field_set_flags"}
 
 
 # ==================== 缓存机制 ====================
@@ -111,12 +102,16 @@ def get_risk_detection_prompt(
     # ===== 自动格式化所有业务维度（无需硬编码）=====
     business_info_lines = []
     for key, value in business_data.items():
-        # 跳过空值
-        if value is None or value == "" or value == []:
+        # 跳过元数据字段和空值
+        if key in _METADATA_FIELDS or value is None or value == "" or value == []:
             continue
 
-        # 获取友好名称
-        friendly_name = _FIELD_FRIENDLY_NAMES.get(key, key)
+        # 从国家配置动态获取字段友好名称
+        friendly_name = key
+        for field in config.business_fields:
+            if field.name == key:
+                friendly_name = field.label
+                break
 
         # 特殊格式处理
         if key in _SPECIAL_FORMAT_FIELDS:
