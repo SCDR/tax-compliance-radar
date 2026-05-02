@@ -20,22 +20,34 @@ QA_SYSTEM_PROMPT = """
 【核心原则 - 违反即幻觉，一票否决】
 1. 只依据给定的【检索到的相关法规】内容回答，绝对不能编造法规或提供不确定的信息
 2. 如果检索结果显示"未检索到相关合规信息"或"暂无相关合规信息"，必须如实告知用户，不能臆测
-3. 所有回答必须引用具体法规来源，禁止使用"根据相关法规"等模糊表述
-4. 禁止回答与泰国VAT合规无关的问题
+3. 禁止回答与泰国VAT合规无关的问题
 
-【输出结构 - 严格JSON格式，包含以下7个字段】
-- regulation_base: 列出引用的具体法规名称及来源（如"泰国VAT注册规则（https://...）"）
-- core_rules: 提炼核心合规规则，用简洁清晰的中文表述
-- compliance_suggestion: 具体可行的合规建议，至少2-3条
-- risk_warning: 不遵守规则的具体风险后果
-- operation_guide: 操作指引，分步骤说明
-- original_link: 引用法规的原文链接，多个链接用分号分隔
-- disclaimer: 固定免责声明文本
+【回答要求】
+1. 根据用户的问题，用自然、流畅的中文直接回答，不要使用强制结构化格式
+2. 回答要准确、专业、有针对性，直接回应用户的疑问
+3. 语言要自然，像专业顾问的对话，而不是机械的模板输出
+
+【重要 - 关于引用来源】
+- 对于每个引用的法规，请在regulation_base字段中填写对应的文件名，不要直接写入answer中
+- 可用的法规文件名列表：
+  * 01_vat_registration_rules.md - 泰国VAT注册规则
+  * 02_low_value_goods_policy_2026.md - 低价值商品VAT政策 (2026)
+  * 03_platform_withholding_rules.md - 平台代扣代缴规则
+  * 04_monthly_reporting_audit.md - 月度申报与稽查要求
+- 多个文件引用请用分号分隔，例如："01_vat_registration_rules.md; 02_low_value_goods_policy_2026.md"
 
 【防幻觉机制】
-- 任何内容如果在检索法规中不存在，请在对应字段填写"暂无相关信息"
-- 如果整体无相关信息，所有字段统一填写"暂无相关合规信息"
+- 如果没有相关法规内容，请如实回答"抱歉，暂未检索到相关的合规信息"
 - 禁止使用"根据相关规定"、"可能"、"大概"等模糊词汇
+- 禁止编造不存在的法规名称、编号或内容
+
+【输出格式 - 严格JSON格式】
+{{
+    "answer": "你的自然回答内容",
+    "regulation_base": "引用的法规文件名，多个用分号分隔，例如："01_vat_registration_rules.md; 02_low_value_goods_policy_2026.md",
+    "original_link": "留空字符串即可",
+    "disclaimer": "固定免责声明文本"
+}}
 """.strip()
 
 
@@ -121,32 +133,38 @@ def generate_qa_answer_with_rag(
 {context}
 
 请基于以上检索到的法规内容，按照要求的JSON格式回答问题。
-如果没有相关法规内容，请如实填写"暂无相关合规信息"。
+如果没有相关法规内容，请如实回答"抱歉，暂未检索到相关的合规信息"。
 """.strip()
 
     _, content = _chat_with_fallback(QA_SYSTEM_PROMPT, user_prompt)
     payload = _extract_json(content)
 
-    for field in [
-        "regulation_base",
-        "core_rules",
-        "compliance_suggestion",
-        "risk_warning",
-        "operation_guide",
-        "original_link",
-        "disclaimer",
-    ]:
-        payload[field] = _normalize_text_field(payload.get(field, "暂无相关信息"))
+    # 标准化必选字段
+    answer = _normalize_text_field(payload.get("answer", "抱歉，暂未检索到相关的合规信息"))
+    payload["regulation_base"] = _normalize_text_field(payload.get("regulation_base", "暂无相关信息"))
+    payload["original_link"] = _normalize_text_field(payload.get("original_link", ""))
+    payload["disclaimer"] = _normalize_text_field(
+        payload.get("disclaimer", "本工具仅供参考，不构成税务/法律意见，不替代专业顾问服务。")
+    )
 
+    # 在 answer 末尾追加来源引用
+    if payload["regulation_base"] and payload["regulation_base"] != "暂无相关信息":
+        answer = answer + "\n\n**引用来源：**\n" + payload["regulation_base"]
+
+    # 为向后兼容：answer 放到 core_rules 中（schema 必须字段）
+    payload["core_rules"] = answer
+    payload["compliance_suggestion"] = ""
+    payload["risk_warning"] = ""
+    payload["operation_guide"] = ""
+
+    # 追加检索到的来源到 regulation_base
     if not retrieval_result.below_threshold and retrieval_result.documents:
         sources = get_source_references(retrieval_result)
         if sources:
-            payload["regulation_base"] = (
-                payload["regulation_base"] + "\n引用来源: " + "; ".join(sources)
-            )
-
-    if "disclaimer" not in payload or not payload["disclaimer"]:
-        payload["disclaimer"] = "本工具仅供参考，不构成税务/法律意见，不替代专业顾问服务。"
+            if payload["regulation_base"] and payload["regulation_base"] != "暂无相关信息":
+                payload["regulation_base"] = payload["regulation_base"] + "; " + "; ".join(sources)
+            else:
+                payload["regulation_base"] = "; ".join(sources)
 
     return QAAnswer.model_validate(payload)
 

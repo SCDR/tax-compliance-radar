@@ -1,6 +1,7 @@
 """Ollama 本地LLM提供者 - 具体策略实现"""
 from __future__ import annotations
 
+from typing import AsyncGenerator
 import ollama  # type: ignore[import-not-found]
 
 from tax_compliance_radar.config import settings
@@ -86,3 +87,36 @@ class OllamaProvider(LLMProvider):
             },
         )
         return response["response"]
+
+    async def astream(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        model: str | None = None,
+        reasoning_effort: str = "minimal",
+    ) -> AsyncGenerator[str, None]:
+        """异步流式生成文本
+
+        Args:
+            system_prompt: 系统提示词
+            user_prompt: 用户提示词
+            model: 可选，覆盖默认模型
+
+        Yields:
+            生成的文本块（逐token）
+        """
+        use_model = model or self.default_model
+        stream = await self._get_async_client().generate(
+            model=use_model,
+            prompt=f"{system_prompt}\n\n{user_prompt}",
+            stream=True,
+            format=self.format,
+            options={
+                "temperature": self.temperature,
+                "num_predict": self.max_tokens,
+            },
+        )
+
+        async for chunk in stream:
+            if "response" in chunk and chunk["response"]:
+                yield chunk["response"]

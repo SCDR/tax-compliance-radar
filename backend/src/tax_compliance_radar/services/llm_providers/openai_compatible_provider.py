@@ -9,7 +9,7 @@
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, AsyncGenerator
 
 from openai import OpenAI, AsyncOpenAI
 
@@ -122,3 +122,44 @@ class OpenAICompatibleProvider(LLMProvider):
         if content is None:
             raise RuntimeError("LLM 返回空内容")
         return content
+
+    async def astream(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        model: str | None = None,
+        reasoning_effort: str = "minimal",
+    ) -> AsyncGenerator[str, None]:
+        """异步流式生成文本
+
+        Args:
+            system_prompt: 系统提示词
+            user_prompt: 用户提示词
+            model: 可选，覆盖默认模型
+            reasoning_effort: 思考深度：minimal(默认)/low/high
+
+        Yields:
+            生成的文本块（逐token）
+        """
+        use_model = model or self.default_model
+
+        extra_options: dict[str, Any] = {}
+        # 使用传入的 reasoning_effort 参数，优先于默认配置
+        extra_options["reasoning_effort"] = reasoning_effort
+
+        stream = await self._get_async_client().chat.completions.create(
+            model=use_model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            stream=True,
+            response_format={"type": "json_object"},
+            **extra_options,
+        )
+
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content

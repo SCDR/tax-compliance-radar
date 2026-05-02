@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Tuple
+from typing import AsyncGenerator, Tuple
 
 
 class LLMProvider(ABC):
@@ -69,6 +69,27 @@ class LLMProvider(ABC):
         provider_name = self.__class__.__name__
         raise RuntimeError(f"{provider_name} 调用失败: {last_error}") from last_error
 
+    @abstractmethod
+    async def astream(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        model: str | None = None,
+        reasoning_effort: str = "minimal",
+    ) -> AsyncGenerator[str, None]:
+        """异步流式生成文本
+
+        Args:
+            system_prompt: 系统提示词
+            user_prompt: 用户提示词
+            model: 可选，覆盖默认模型
+            reasoning_effort: 思考深度：minimal(默认)/low/high
+
+        Yields:
+            生成的文本块（逐字或逐token）
+        """
+        raise NotImplementedError
+
     async def achat_with_fallback(self, system_prompt: str, user_prompt: str) -> Tuple[str, str]:
         """带降级策略的异步调用
 
@@ -92,3 +113,32 @@ class LLMProvider(ABC):
                 last_error = exc
         provider_name = self.__class__.__name__
         raise RuntimeError(f"{provider_name} 异步调用失败: {last_error}") from last_error
+
+    async def astream_with_fallback(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        reasoning_effort: str = "minimal",
+    ) -> Tuple[str, AsyncGenerator[str, None]]:
+        """带降级策略的流式调用
+
+        优先使用主模型，失败后依次尝试备选模型
+
+        Args:
+            system_prompt: 系统提示词
+            user_prompt: 用户提示词
+
+        Returns:
+            (使用的模型名, 流式生成器)
+        """
+        from tax_compliance_radar.config import settings
+
+        candidates = (settings.llm.model, *settings.llm.fallback_models)
+        last_error: Exception | None = None
+        for model in candidates:
+            try:
+                return model, self.astream(system_prompt, user_prompt, model, reasoning_effort)
+            except Exception as exc:
+                last_error = exc
+        provider_name = self.__class__.__name__
+        raise RuntimeError(f"{provider_name} 流式调用失败: {last_error}") from last_error
