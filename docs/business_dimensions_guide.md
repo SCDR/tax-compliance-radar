@@ -2,100 +2,157 @@
 
 ## 概述
 
-本系统支持**零代码侵入式**业务维度扩展，涵盖**通用维度（全局共用）**和**多国维度（按国家区分）**两类。新增业务维度只需在数据模型中定义字段，即可自动在整个合规检查链路中生效，包括：
+本系统已升级为**完全 YAML 配置驱动**的零代码扩展方案。新增国家、新增业务字段，**无需修改任何 Python 代码**，只需修改配置文件即可自动生效。
 
-- ✅ **通用维度自动扩展**：如企业规模、所属行业等，所有国家共用
-- ✅ **多国维度自动扩展**：如销售额、平台等，每个国家可不同
-- ✅ 规则引擎自动识别并可用于条件判断
-- ✅ AI 风险检测提示词自动注入
-- ✅ LLM 建议生成器自动感知
-- ✅ 缓存键自动包含维度数据
+整个合规检查链路自动支持：
 
----
-
-## 快速添加新维度（3 步完成）
-
-### 维度类型
-
-系统支持两种类型的业务维度，**两者都支持自动扩展**：
-
-| 类型 | 命名规范 | 作用域 | 示例 |
-|------|----------|--------|------|
-| **通用维度** | 普通字段名 | 所有国家共用 | `business_type`, `company_size`, `industry` |
-| **多国维度** | `xxx_by_country` 后缀 | 每个国家可不同 | `annual_sales_by_country`, `platforms_by_country` |
+- ✅ **前端表单动态渲染**
+- ✅ **规则引擎自动识别**
+- ✅ **AI 风险检测提示词自动注入**
+- ✅ **LLM 建议生成器自动感知**
+- ✅ **缓存键自动包含维度数据**
 
 ---
 
-### 步骤 1: 在 BusinessProfile 中添加字段定义
+## 快速开始
 
-**文件**: `backend/src/tax_compliance_radar/models/schemas.py`
+### 新增业务字段（1 步完成）
 
-```python
-class BusinessProfile(BaseModel):
-    """跨国家通用的业务信息"""
-    
-    # ===== 通用维度（所有国家共用）=====
-    business_type: str  # 现有通用维度
-    
-    # ✅ 新增通用维度（自动扩展，无需后缀）
-    company_size: str = Field(
-        default="",
-        description="企业规模：小型/中型/大型"
-    )
-    industry: str = Field(
-        default="",
-        description="所属行业：3C电子/服饰/美妆等"
-    )
-    
-    # ===== 多国维度（每个国家可不同）=====
-    # 字段名必须遵循 xxx_by_country 命名规范
-    annual_sales_by_country: Dict[str, int] = Field(
-        default_factory=dict,
-        description="按国家区分的年销售额"
-    )
-    platforms_by_country: Dict[str, List[str]] = Field(
-        default_factory=dict,
-        description="按国家区分的入驻平台"
-    )
-    
-    # ✅ 新增多国维度（自动扩展，需 _by_country 后缀）
-    logistics_mode_by_country: Dict[str, str] = Field(
-        default_factory=dict,
-        description="按国家区分的物流模式：直邮/保税仓/本地仓"
-    )
-    
-    payment_channel_by_country: Dict[str, List[str]] = Field(
-        default_factory=dict,
-        description="按国家区分的支付渠道列表"
-    )
-    
-    has_import_license_by_country: Dict[str, bool] = Field(
-        default_factory=dict,
-        description="按国家区分是否有进口许可证"
-    )
-    
-    employee_count_by_country: Dict[str, int] = Field(
-        default_factory=dict,
-        description="按国家区分的本地员工数量"
-    )
+编辑 `backend/data/countries.yaml`，在 `business_fields` 数组中添加新字段：
+
+```yaml
+countries:
+  - code: TH
+    name: 泰国
+    # ... 其他配置
+    business_fields:
+      # ===== 已有字段 =====
+      - name: annual_sales
+        label: 年预计销售额
+        type: number
+        required: true
+        placeholder: 请输入年销售额（泰铢）
+      
+      # ===== ✅ 新增字段 =====
+      - name: logistics_mode
+        label: 物流模式
+        type: select          # 下拉单选
+        options: ["直邮", "保税仓", "本地仓", "第三方"]
+      
+      - name: payment_channel
+        label: 支付渠道
+        type: multiselect     # 下拉多选
+        options: ["PayPal", "Stripe", "COD", "银行转账"]
+      
+      - name: import_license_type
+        label: 进口许可证类型
+        type: select
+        options: ["API", "NPIK", "无"]
+      
+      - name: local_employee_count
+        label: 本地员工数量
+        type: number
+        placeholder: 请输入本地员工数量
+        min_value: 0
+```
+
+**保存即生效！** 重启服务后：
+1. 前端表单自动出现新字段
+2. 规则引擎可直接使用 `logistics_mode` / `payment_channel` 等字段
+3. LLM 提示词自动包含新字段
+
+---
+
+### 新增国家（1 步完成）
+
+在 `backend/data/countries.yaml` 中添加完整的国家配置：
+
+```yaml
+countries:
+  # ... 已有国家
+  - code: SG
+    name: 新加坡
+    currency: SGD
+    currency_symbol: 新加坡元
+    tax_type: GST
+    tax_rate: 9.0
+    registration_threshold: 1000000
+    language: zh
+    flag: 🇸🇬
+    business_types: ["跨境电商零售", "品牌出海直营"]
+    platforms: ["Shopee", "Lazada", "Amazon"]
+    business_fields:
+      - name: annual_sales
+        label: 年预计销售额
+        type: number
+        required: true
+        placeholder: 请输入年销售额（新加坡元）
+      - name: platforms
+        label: 入驻平台
+        type: multiselect
+        options: ["Shopee", "Lazada", "Amazon"]
+      - name: has_gst_registration
+        label: 是否已GST注册
+        type: select
+        options: ["是", "否", "办理中"]
+      - name: import_declaration_mode
+        label: 进口申报模式
+        type: select
+        options: ["自主申报", "代理申报", "保税仓申报"]
+```
+
+重启服务即可生效，前端可选国家列表自动更新。
+
+---
+
+## 字段类型说明
+
+| 类型 | 说明 | 前端渲染 | 必填配置 |
+|------|------|----------|----------|
+| `number` | 数字输入 | InputNumber 组件 | `required: true/false` |
+| `select` | 单选下拉 | Select 组件 | 需配置 `options` 数组 |
+| `multiselect` | 多选下拉 | Select 组件（mode=multiple） | 需配置 `options` 数组 |
+| `text` | 文本输入 | Input 组件 | `placeholder` 可选 |
+
+### 完整字段配置示例
+
+```yaml
+business_fields:
+  # ===== number 类型 =====
+  - name: annual_sales
+    label: 年预计销售额           # 前端显示标签
+    type: number                 # 字段类型
+    required: true               # 是否必填
+    placeholder: 请输入年销售额   # 占位提示
+    min_value: 0                 # 最小值（前端校验）
+    max_value: 1000000000000     # 最大值（前端校验）
+  
+  # ===== select 类型 =====
+  - name: warehousing_mode
+    label: 仓储模式
+    type: select
+    options: ["本地仓", "海外仓", "直邮"]  # 选项列表
+  
+  # ===== multiselect 类型 =====
+  - name: product_categories
+    label: 商品类目
+    type: multiselect
+    options: ["电子产品", "服饰", "美妆", "家居", "食品"]
 ```
 
 ---
 
-### 步骤 2: 在规则配置中使用新维度
+## 在规则中使用新字段
 
-**文件**: `backend/data/rules/{country_code}_rules.yaml`
-
-在规则的 `condition` 字段中直接使用维度名（去掉 `_by_country` 后缀）。
+编辑 `backend/data/rules/{country_code}_rules.yaml`，直接使用字段名：
 
 ```yaml
 rules:
-  # ===== 使用新维度的规则示例 =====
-  
+  # ===== 使用新字段的规则示例 =====
   - rule_id: TH_R008
     description: 保税仓模式关税申报要求
     category: reporting
-    # 直接使用新维度字段名
+    # 直接使用新字段名
     condition: "logistics_mode == '保税仓'"
     risk_template:
       risk_level: 中风险
@@ -107,8 +164,8 @@ rules:
   - rule_id: TH_R009
     description: 第三方支付渠道备案要求
     category: compliance
-    # 支持列表操作
-    condition: "len(set(payment_channel) & {'PayPal', 'Stripe'}) > 0"
+    # 列表包含判断
+    condition: "'PayPal' in payment_channel or 'Stripe' in payment_channel"
     risk_template:
       risk_level: 高风险
       risk_desc: 使用境外支付渠道需在泰国银行进行外汇交易备案
@@ -119,8 +176,8 @@ rules:
   - rule_id: TH_R010
     description: 无进口许可证合规风险
     category: registration
-    # 支持布尔值判断
-    condition: "has_import_license == False and employee_count > 10"
+    # 多条件组合
+    condition: "import_license_type == '无' and local_employee_count > 10"
     risk_template:
       risk_level: 高风险
       risk_desc: 员工超过10人但无进口许可证，需尽快办理
@@ -131,143 +188,24 @@ rules:
 
 ---
 
-### 步骤 3 (可选): 添加字段友好名称映射
+## API 请求格式
 
-**文件**: 
-- `backend/src/tax_compliance_radar/services/ai_risk_detector.py`
-- `backend/src/tax_compliance_radar/services/suggestion_generator.py`
-
-添加友好名称以便在 LLM 提示词中正确显示：
-
-```python
-_FIELD_FRIENDLY_NAMES = {
-    # ===== 已有维度 =====
-    "business_type": "业务类型",
-    "annual_sales": "年销售额",
-    "platforms": "入驻平台",
-    
-    # ===== 新增维度的友好名称 =====
-    "logistics_mode": "物流模式",
-    "payment_channel": "支付渠道",
-    "has_import_license": "进口许可证",
-    "employee_count": "员工数量",
-}
-```
-
----
-
-## ✅ 完成！
-
-**无需修改任何核心代码**。新维度将自动：
-
-1. 被 `_extract_country_business` 提取到单国家业务数据
-2. **自动注入配置的默认值**（消除 None 歧义）
-3. 被规则引擎 `evaluate` 方法注入到 eval 环境
-4. 被 AI 风险检测 `get_risk_detection_prompt` 格式化到提示词
-5. 被 LLM 建议生成器自动感知并用于建议生成
-6. 被缓存键生成 `_get_cache_key` 自动包含
-7. **自动记录元数据** `_field_set_flags`（可选使用）
-
----
-
-### 🎯 设计理念：两全其美的 None 处理
-
-| 问题 | 解决方案 |
-|------|---------|
-| 无法区分 `annual_sales = 0` vs "未传递" | **元数据标记**：通过 `_field_set_flags` 特殊字段记录字段是否被显式传递 |
-| 规则编写者需要写防御代码 `x is not None and x > 0` | **默认值注入**：规则编写者永远不会看到 None，只需写业务逻辑 |
-| 向后兼容性 | **可选使用**：元数据字段可选使用，不影响现有规则 |
-
----
-
-### 📋 可选：高级用法（区分"值为0" vs "未传递"）
-
-**只有需要区分时才使用**，普通场景可以完全忽略：
-
-```yaml
-# ===== 普通用法（99% 场景）=====
-# 简洁直观，无需关心是否传递
-condition: "annual_sales > 1000000"
-
-# ===== 高级用法（1% 特殊场景）=====
-# 只有明确传递了字段，才做判断
-condition: "_field_set_flags.annual_sales == True and annual_sales > 1000000"
-
-# 针对未传递字段的特殊处理
-condition: "_field_set_flags.employee_count == False"  # 员工数字段未传递
-```
-
-**元数据字段说明**：
-```python
-# 自动注入到每个国家的业务数据中
-{
-  "business_type": "跨境电商零售",
-  "annual_sales": 5000000,
-  "platforms": ["Shopee"],
-  
-  # 🌟 元数据：标记每个字段是否被用户显式传递
-  "_field_set_flags": {
-    "business_type": True,
-    "annual_sales": True,
-    "platforms": True,
-    "employee_count": False,   # 这个字段用户没传
-  }
-}
-```
-
-**配置文件**：`backend/src/tax_compliance_radar/field_config.py`
-
-```python
-FIELD_METADATA = {
-    "annual_sales": FieldMetadata(
-        default_value=0,        # 未传递时自动注入 0
-        field_type="int",
-        description="年销售额",
-    ),
-    "has_local_entity": FieldMetadata(
-        default_value=False,    # 未传递时自动注入 False
-        field_type="bool",
-    ),
-    "platforms": FieldMetadata(
-        default_value=[],       # 未传递时自动注入 []
-        field_type="list[str]",
-    ),
-}
-```
-
-**规则编写者只需写**：
-```yaml
-# ✅ 简洁，无需 None 判断
-condition: annual_sales > 1000000
-condition: len(platforms) > 0
-condition: has_local_entity == True
-```
-
----
-
-## API 请求示例
-
-添加新维度后，前端请求格式如下：
+新增字段后，前端请求自动适配，格式如下：
 
 ```json
 POST /api/v1/multi/audit/submit
 {
   "selected_countries": ["TH", "VN"],
   "business_profile": {
-    // ===== 通用维度（所有国家共用）=====
     "business_type": "跨境电商零售",
-    "company_size": "中型企业",
-    "industry": "3C电子产品",
     
-    // ===== 多国维度（每个国家可不同）=====
+    // ===== 通用字段 =====
     "annual_sales_by_country": {
       "TH": 5000000,
       "VN": 300000000
     },
-    "platforms_by_country": {
-      "TH": ["Shopee", "Lazada"],
-      "VN": ["TikTok Shop"]
-    },
+    
+    // ===== 新增字段自动支持 =====
     "logistics_mode_by_country": {
       "TH": "保税仓",
       "VN": "直邮"
@@ -276,11 +214,11 @@ POST /api/v1/multi/audit/submit
       "TH": ["PayPal", "Stripe"],
       "VN": ["COD", "Momo"]
     },
-    "has_import_license_by_country": {
-      "TH": false,
-      "VN": true
+    "import_license_type_by_country": {
+      "TH": "无",
+      "VN": "API"
     },
-    "employee_count_by_country": {
+    "local_employee_count_by_country": {
       "TH": 25,
       "VN": 15
     }
@@ -288,149 +226,137 @@ POST /api/v1/multi/audit/submit
 }
 ```
 
-**自动提取结果**：
-- 泰国规则引擎看到：`{"business_type": "跨境电商零售", "company_size": "中型企业", "industry": "3C电子产品", "annual_sales": 5000000, ...}`
-- 越南规则引擎看到：`{"business_type": "跨境电商零售", "company_size": "中型企业", "industry": "3C电子产品", "annual_sales": 300000000, ...}`
+---
+
+## 🎯 设计理念：全链路自动感知
+
+### 数据流转图
+
+```
+YAML 配置文件 (countries.yaml)
+    │
+    ▼ 服务启动时加载
+  CountryRegistry
+    │
+    ├─────────────────────────────────────────┐
+    │                                         ▼
+    │                              GET /countries/config/all
+    │                                         │
+    │                                         ▼
+    │                                    前端 App
+    │                                         │
+    │                                    动态表单渲染
+    │                                         │
+    │                                         ▼
+    │                              用户提交审核请求
+    │                                         │
+    ▼                                         ▼
+  后端接收 → BusinessProfile → _extract_country_business
+                                                    │
+                                                    ▼
+                ┌──────────────────┬──────────────────┬──────────────────┐
+                │                  │                  │                  │
+                ▼                  ▼                  ▼                  ▼
+            规则引擎         AI 风险检测       LLM 建议生成       缓存键生成
+            (evaluate)      (提示词注入)       (提示词注入)       (自动包含)
+                │                  │                  │                  │
+                └──────────────────┴──────────────────┴──────────────────┘
+                                          │
+                                          ▼
+                                    合规审核报告
+```
+
+### 核心机制
+
+1. **动态字段校验**：`BusinessProfile` 使用 Pydantic `model_config = {"extra": "allow"}` 支持任意字段
+2. **自动提取逻辑**：`_extract_country_business` 遍历 `model_dump()` 结果，自动识别所有 `xxx_by_country` 字段
+3. **配置驱动渲染**：前端根据 `/countries/config/all` 返回的配置动态渲染表单
+4. **LLM 友好名称**：从国家配置的 `label` 动态获取，无需硬编码
 
 ---
 
-## 测试新维度
+## 旧方案迁移指南
 
-### 运行现有测试
-```bash
-cd backend
-uv run pytest tests/unit/test_extensible_dimensions.py -v
-```
+如果之前使用的是修改 `schemas.py` 的方式，请按以下步骤迁移到新方案：
 
-### 编写新测试
+### 迁移步骤
 
-**文件**: `backend/tests/unit/test_extensible_dimensions.py`
+1. **删除代码中的字段定义**：从 `BusinessProfile` 中移除手动定义的字段
+2. **移到 YAML 配置**：将字段定义添加到 `countries.yaml` 的 `business_fields` 中
+3. **删除友好名称映射**：`_FIELD_FRIENDLY_NAMES` 字典不再需要，系统自动从 `label` 读取
 
-```python
-def test_new_dimension_rule():
-    """测试新维度规则"""
-    engine = CountryRulesEngine.get_for_country("TH")
-    config = CountryRegistry.get("TH")
-    
-    business = {
-        "business_type": "跨境电商零售",
-        "annual_sales": 5000000,
-        "platforms": ["Shopee"],
-        "logistics_mode": "保税仓",  # 新维度
-    }
-    
-    def make_source(rid=None, st="rule"):
-        return SourceInfo(country_code="TH", country_name="泰国", 
-                         regulation_id=rid, source_type=st)
-    
-    risks = engine.evaluate(business, make_source, config)
-    triggered_rules = [r.source_info.regulation_id for r in risks]
-    
-    assert "TH_R008" in triggered_rules, "保税仓规则未触发"
-```
+### 迁移前后对比
 
----
-
-## 支持的数据类型
-
-| 类型 | 说明 | 示例 |
-|------|------|------|
-| `str` | 字符串枚举 | `"保税仓"`, `"直邮"` |
-| `int` | 整数数值 | `10000`, `25` |
-| `bool` | 布尔值 | `True`, `False` |
-| `List[str]` | 字符串列表 | `["PayPal", "Stripe"]` |
-
----
-
-## 规则表达式语法参考
-
-```yaml
-# ===== 通用维度（所有国家共用）=====
-condition: business_type == '跨境电商零售'
-condition: company_size == '大型企业'
-condition: industry == '3C电子产品'
-
-# ===== 多国维度（每个国家可不同）=====
-# 简单相等判断
-condition: logistics_mode == '保税仓'
-
-# 布尔值判断
-condition: has_import_license == False
-
-# 数值比较
-condition: employee_count > 10
-condition: annual_sales >= 1000000
-
-# 列表包含判断
-condition: "'PayPal' in payment_channel"
-condition: "len(payment_channel) > 0"
-
-# 集合交集判断
-condition: "len(set(payment_channel) & {'PayPal', 'Stripe'}) > 0"
-
-# 多条件组合（通用维度 + 多国维度混合）
-condition: "business_type == '跨境电商零售' and logistics_mode == '保税仓'"
-condition: "industry == '美妆' and has_import_license == False"
-condition: "company_size == '大型企业' or annual_sales > 10000000"
-```
+| 项目 | 旧方案 | 新方案 |
+|------|--------|--------|
+| 新增字段位置 | `schemas.py` + Python 代码 | `countries.yaml` |
+| 友好名称 | 硬编码 `_FIELD_FRIENDLY_NAMES` | 配置中的 `label` |
+| 前端表单 | 需手动修改 React 代码 | 自动动态渲染 |
+| 生效方式 | 代码修改 + 重启 | 修改配置 + 重启 |
 
 ---
 
 ## 最佳实践
 
-1. **命名规范**: 字段名使用 `snake_case`，`xxx_by_country` 后缀
-2. **类型明确**: 明确标注类型（`Dict[str, int]` / `Dict[str, List[str]]` 等）
-3. **注释完整**: 添加清晰的 `description` 说明字段用途和可选值
-4. **友好名称**: 为 AI 提示词添加中文友好名称映射
-5. **规则测试**: 新增规则后编写单元测试验证触发逻辑
-6. **文档同步**: 新增维度后同步更新 API 文档和前端接口定义
+1. **字段命名统一**：使用 `snake_case` 命名，多国字段自动以 `_by_country` 传递
+2. **配置完整**：为每个字段提供清晰的 `label` 和 `placeholder`
+3. **选项明确**：`select`/`multiselect` 类型必须提供 `options` 数组
+4. **规则测试**：新增规则后编写单元测试验证触发逻辑
+5. **配置复用**：相同字段在多个国家使用时，可复制配置避免重复输入
 
 ---
 
 ## 常见问题
 
-### Q: 为什么我的规则没有触发？
+### Q: 为什么新增字段没有出现在前端？
 
 **A**: 检查以下几点：
-1. 维度名是否正确（去掉 `_by_country` 后缀）
-2. YAML 规则中 condition 字段的引号是否正确（特殊字符需用双引号包裹）
+1. 是否已重启后端服务（配置在启动时加载）
+2. 前端是否调用了 `/countries/config/all` 获取最新配置
+3. 浏览器是否有缓存，刷新页面试试
+
+### Q: 规则没有触发？
+
+**A**: 检查：
+1. 规则中的字段名是否与配置中的 `name` 一致（去掉 `_by_country`）
+2. YAML 规则的 `condition` 字段引号是否正确
 3. 业务数据中是否传入了正确的值
-4. 运行测试查看具体错误信息
 
-### Q: 新维度在 AI 提示词中如何显示？
+### Q: 不同国家可以有不同的字段吗？
 
-**A**: 如果配置了 `_FIELD_FRIENDLY_NAMES`，会显示友好名称；否则显示原始字段名。空值或空列表会被自动跳过。
+**A**: 完全可以！每个国家有独立的 `business_fields` 配置，前端根据选中国家动态显示对应字段。
 
-### Q: 新增维度需要重启服务吗？
+### Q: LLM 能识别新字段吗？
 
-**A**: 是的，代码修改（`schemas.py`）需要重启服务。但如果只是修改 YAML 规则文件，可以调用 `CountryRulesEngine.reload_all()` 热重载。
-
-### Q: 不同国家可以有不同的维度吗？
-
-**A**: 可以。`BusinessProfile` 中定义的是所有国家的超集，具体某个国家可以不传特定维度的数据，不传的字段将使用默认值（空列表/0/False/空字符串）。
+**A**: 是的。系统从国家配置的 `label` 字段自动获取友好名称，注入到 LLM 提示词中，无需额外配置。
 
 ---
 
-## 自动传递链路图
+## 后端 API 说明
+
+### 获取所有国家配置
 
 ```
-API 请求
-    │
-    ▼
-BusinessProfile (xxx_by_country)
-    │
-    ▼  自动提取
-MultiCountryAuditStrategy._extract_country_business
-    │
-    ▼  自动注入
-    ├─────────────┬──────────────┐
-    │             │              │
-    ▼             ▼              ▼
-规则引擎     AI 风险检测   LLM 建议生成
-(eval)     (提示词)       (提示词)
-    │             │              │
-    └─────────────┴──────────────┘
-    │
-    ▼
-风险识别结果 / 合规建议
+GET /api/v1/countries/config/all
 ```
+
+返回包含所有国家的完整配置，包括业务字段定义：
+
+```json
+{
+  "TH": {
+    "country_code": "TH",
+    "country_name": "泰国",
+    "currency": "THB",
+    "tax_type": "VAT",
+    "flag": "🇹🇭",
+    "business_fields": [
+      {"name": "annual_sales", "label": "年预计销售额", "type": "number", ...},
+      ...
+    ]
+  },
+  ...
+}
+```
+
+前端使用此配置动态生成表单。
