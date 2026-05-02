@@ -89,3 +89,32 @@ def insert_qa_history(query_text: str, answer_text: dict, recall_doc_ids: list[s
         )
         connection.commit()
         return int(cursor.lastrowid)
+
+
+def insert_audit_history(business_info: dict, audit_report: dict) -> int:
+    """保存审核历史记录"""
+    all_risks = audit_report.get("all_risks", [])
+    high_risk_count = sum(1 for r in all_risks if r.get("risk_level") == "高风险")
+    medium_risk_count = sum(1 for r in all_risks if r.get("risk_level") == "中风险")
+    low_risk_count = sum(1 for r in all_risks if r.get("risk_level") == "低风险")
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO audit_history (
+                business_info, audit_report, high_risk_count,
+                medium_risk_count, low_risk_count, create_time
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                json.dumps(business_info, ensure_ascii=False),
+                json.dumps(audit_report, ensure_ascii=False),
+                high_risk_count,
+                medium_risk_count,
+                low_risk_count,
+                utc_now_iso(),
+            ),
+        )
+        connection.commit()
+        return int(cursor.lastrowid)
