@@ -1,0 +1,9 @@
+/* 测试最直接的选择器 */
+.ant-card {
+  transition: transform 0.3s ease !important;
+}
+
+.ant-card:hover {
+  transform: translateY(-10px) !important;
+  background: red !important;
+}

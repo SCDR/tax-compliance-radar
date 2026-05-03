@@ -174,6 +174,33 @@ function App() {
     const auditStreamRef = useRef(null)
     const auditRunIdRef = useRef(0)
 
+    // 格式化时间显示：今天显示 HH:mm，昨天显示"昨天 HH:mm"，更早显示 MM-dd HH:mm
+    const formatTime = (timeStr) => {
+        if (!timeStr) return ''
+        try {
+            const time = new Date(timeStr)
+            const now = new Date()
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+            const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000)
+            const timeDate = new Date(time.getFullYear(), time.getMonth(), time.getDate())
+
+            const hours = time.getHours().toString().padStart(2, '0')
+            const minutes = time.getMinutes().toString().padStart(2, '0')
+
+            if (timeDate.getTime() === today.getTime()) {
+                return `${hours}:${minutes}`
+            } else if (timeDate.getTime() === yesterday.getTime()) {
+                return `昨天 ${hours}:${minutes}`
+            } else {
+                const month = (time.getMonth() + 1).toString().padStart(2, '0')
+                const day = time.getDate().toString().padStart(2, '0')
+                return `${month}-${day} ${hours}:${minutes}`
+            }
+        } catch {
+            return timeStr
+        }
+    }
+
     // 占位符 Slogan 轮播状态
     const [currentSloganIndex, setCurrentSloganIndex] = useState(0)
     const prevSloganIndexRef = useRef(-1)
@@ -417,10 +444,11 @@ function App() {
                                     dataSource={qaHistory.slice(0, 10)}
                                     renderItem={(item) => (
                                         <List.Item
+                                            className="history-list-item"
                                             style={{ cursor: 'pointer' }}
                                             onClick={() => setQaHistoryModal({ open: true, qaId: item.qa_id })}
                                             actions={[
-                                                <Text type="secondary" key="time" style={{ fontSize: '12px' }}>{item.create_time}</Text>
+                                                <Text type="secondary" key="time" style={{ fontSize: '12px', whiteSpace: 'nowrap' }}>{formatTime(item.create_time)}</Text>
                                             ]}
                                         >
                                             <List.Item.Meta
@@ -442,10 +470,10 @@ function App() {
                 label: '合规审核',
                 children: (
                     <div className="audit-tab-content">
-                        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                        {/* 左侧列：表单 */}
-                        <div style={{ flex: '1 1 400px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            <Card className="tech-card" title="合规审核">
+                        {/* 使用 CSS Grid 实现响应式布局：窄屏1列，宽屏2列 */}
+                        <div className="audit-layout-grid">
+                            {/* 1. 表单卡片 - 始终在最前 */}
+                            <Card className="tech-card audit-form-card" title="合规审核">
                             <Form
                                 form={auditForm}
                                 layout="vertical"
@@ -661,45 +689,10 @@ function App() {
                             </Form>
                         </Card>
 
-                        <Card className="tech-card" title="审核历史">
-                            <List
-                                dataSource={auditHistory}
-                                renderItem={(item) => (
-                                    <List.Item style={{ cursor: 'pointer' }} onClick={async () => {
-                                        try {
-                                            const data = await fetchAuditHistoryDetail(item.audit_id)
-                                            setAuditHistoryModal({
-                                                open: true,
-                                                auditId: item.audit_id,
-                                                auditDetail: data.data,
-                                            })
-                                        } catch {
-                                            message.error('获取审核详情失败')
-                                        }
-                                    }}>
-                                        <Space direction="vertical" size={0} style={{ width: '100%' }}>
-                                            <Text strong>{item.summary_title || item.business_type}</Text>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                                                <Text type="secondary" style={{ fontSize: 12 }}>{item.create_time}</Text>
-                                                <div>
-                                                    <Tag color="red" style={{ fontSize: 11, padding: '0 6px' }}>高: {item.risk_count?.high_risk || 0}</Tag>
-                                                    <Tag color="orange" style={{ fontSize: 11, padding: '0 6px' }}>中: {item.risk_count?.medium_risk || 0}</Tag>
-                                                    <Tag color="green" style={{ fontSize: 11, padding: '0 6px' }}>低: {item.risk_count?.low_risk || 0}</Tag>
-                                                </div>
-                                            </div>
-                                        </Space>
-                                    </List.Item>
-                                )}
-                            />
-                        </Card>
-                    </div>
-
-                    {/* 右侧列：结果 */}
-                    <div style={{ flex: '1 1 400px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         <Card
-                            className="tech-card"
+                            className="tech-card audit-result-card"
                             title="审核结果"
-                            bodyStyle={{ minHeight: '600px' }}
+                            bodyStyle={{ minHeight: '400px' }}
                             extra={!loadingAudit && auditResult ? <PDFExportButton type="audit" data={auditResult} exportFn={exportAuditReportToPDF} buttonText="导出报告" /> : null}
                         >
                             {loadingAudit ? (
@@ -756,7 +749,38 @@ function App() {
                                 </div>
                             )}
                         </Card>
-                    </div>
+
+                        <Card className="tech-card audit-history-card" title="审核历史">
+                            <List
+                                dataSource={auditHistory}
+                                renderItem={(item) => (
+                                    <List.Item className="history-list-item" style={{ cursor: 'pointer' }} onClick={async () => {
+                                        try {
+                                            const data = await fetchAuditHistoryDetail(item.audit_id)
+                                            setAuditHistoryModal({
+                                                open: true,
+                                                auditId: item.audit_id,
+                                                auditDetail: data.data,
+                                            })
+                                        } catch {
+                                            message.error('获取审核详情失败')
+                                        }
+                                    }}>
+                                        <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                                            <Text strong>{item.summary_title || item.business_type}</Text>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                                <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{formatTime(item.create_time)}</Text>
+                                                <div>
+                                                    <Tag color="red" style={{ fontSize: 11, padding: '0 6px' }}>高: {item.risk_count?.high_risk || 0}</Tag>
+                                                    <Tag color="orange" style={{ fontSize: 11, padding: '0 6px' }}>中: {item.risk_count?.medium_risk || 0}</Tag>
+                                                    <Tag color="green" style={{ fontSize: 11, padding: '0 6px' }}>低: {item.risk_count?.low_risk || 0}</Tag>
+                                                </div>
+                                            </div>
+                                        </Space>
+                                    </List.Item>
+                                )}
+                            />
+                        </Card>
                     </div>
                 </div>
                 ),
@@ -781,21 +805,10 @@ function App() {
             <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabs} />
 
             {/* 问答页面底部悬浮输入卡片 */}
-            <Affix offsetBottom={20} style={{ zIndex: 1000 }}>
+            <Affix offsetBottom={20} style={{ zIndex: activeTab === 'qa' ? 1000 : -1 }}>
                 <div className={`chat-input-wrapper ${activeTab === 'qa' ? 'active' : ''}`}>
                     <div className="app-shell" style={{ paddingTop: 0, paddingBottom: 0, minHeight: 'auto', background: 'none' }}>
-                        <Card
-                            className="tech-card chat-input-card"
-                            style={{
-                                maxWidth: 'none',
-                                boxShadow: '0 -8px 40px rgba(102, 126, 234, 0.18), 0 4px 20px rgba(0, 0, 0, 0.08)',
-                                background: 'rgba(255, 255, 255, 0.95)',
-                                backdropFilter: 'blur(20px)',
-                                WebkitBackdropFilter: 'blur(20px)',
-                                borderRadius: '20px',
-                                border: '1px solid rgba(102, 126, 234, 0.15)',
-                            }}
-                        >
+                        <Card className="tech-card chat-input-card">
                             <Form form={qaForm} layout="vertical" onFinish={async (values) => {
                                 setLoadingQa(true)
                                 setQaStreamText('')
