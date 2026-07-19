@@ -7,6 +7,7 @@ from pathlib import Path
 
 from tax_compliance_radar.config import DATA_DIR, settings
 from tax_compliance_radar.models.schemas import AuditRequest, RiskItem, RiskCount
+from tax_compliance_radar.services.safe_eval import SafeRuleEvaluator
 
 RULES_DB_PATH = DATA_DIR / "compliance_rules.json"
 
@@ -22,7 +23,9 @@ class ComplianceRule:
     def evaluate(self, business: AuditRequest) -> RiskItem | None:
         """安全地执行条件判断"""
         try:
-            result = eval(self.condition_expr, {"business": business})
+            # 使用安全的规则评估器
+            evaluator = SafeRuleEvaluator(names={"business": business})
+            result = evaluator.eval(self.condition_expr)
             if result:
                 return RiskItem(
                     risk_level=self.risk_template.risk_level,

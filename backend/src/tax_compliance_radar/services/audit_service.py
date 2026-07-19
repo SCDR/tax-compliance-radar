@@ -12,7 +12,7 @@ from tax_compliance_radar.services.disclaimer import get_disclaimer
 from tax_compliance_radar.services.llm_service import generate_audit_enhancement
 
 
-def submit_audit(business: AuditRequest, enable_ai_detection: bool | None = None) -> AuditData:
+def submit_audit(business: AuditRequest, enable_ai_detection: bool | None = None, profile_id: str = "default") -> AuditData:
     """
     混合审核流程：
     1. 可配置规则引擎 → 确定性风险（高/中风险）
@@ -63,11 +63,12 @@ def submit_audit(business: AuditRequest, enable_ai_detection: bool | None = None
         cursor = connection.execute(
             """
             INSERT INTO audit_history (
-                business_info, audit_report,
+                profile_id, business_info, audit_report,
                 high_risk_count, medium_risk_count, low_risk_count, create_time
-            ) VALUES (?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
+                profile_id or "default",
                 business.model_dump_json(),
                 report.model_dump_json(),
                 updated_risk_count.high_risk,

@@ -12,7 +12,12 @@ from tax_compliance_radar.api.multi_audit_router import router as multi_audit_ro
 from tax_compliance_radar.api.regulations_router import router as regulations_router
 from tax_compliance_radar.api.sse import router as sse_router
 from tax_compliance_radar.api.qa_stream import router as qa_stream_router
+from tax_compliance_radar.api.profile_router import router as profile_router
+from tax_compliance_radar.api.news_router import router as news_router
+from tax_compliance_radar.api.upload_router import router as upload_router
+from tax_compliance_radar.api.guide_router import router as guide_router
 from tax_compliance_radar.config import settings
+from tax_compliance_radar.database.seed_profiles_news import seed_profiles_and_news
 from tax_compliance_radar.services.db import initialize_database
 
 app = FastAPI(title=settings.app_name)
@@ -105,6 +110,18 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup() -> None:
     initialize_database()
+    # 清理旧数据中 news_pushes 的重复记录（早期版本 UNIQUE 约束建立前可能残留）
+    try:
+        from tax_compliance_radar.services.db import dedupe_news_pushes
+        removed = dedupe_news_pushes()
+        if removed > 0:
+            print(f"[startup] dedupe_news_pushes removed {removed} duplicate rows")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[startup] dedupe_news_pushes failed: {exc}")
+    try:
+        seed_profiles_and_news()
+    except Exception as exc:  # noqa: BLE001
+        print(f"[startup] seed_profiles_and_news failed: {exc}")
 
 
 @app.get("/api/v1/health")
@@ -119,3 +136,7 @@ app.include_router(multi_audit_router)
 app.include_router(regulations_router)
 app.include_router(sse_router)
 app.include_router(qa_stream_router)
+app.include_router(profile_router)
+app.include_router(news_router)
+app.include_router(upload_router)
+app.include_router(guide_router)

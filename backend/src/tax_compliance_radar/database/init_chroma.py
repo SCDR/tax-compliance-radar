@@ -12,7 +12,7 @@ def main() -> None:
         name=CHROMA_COLLECTION_NAME,
         metadata={
             "description": settings.chroma_meta.description,
-            "embedding_model": settings.llm.embedding_model,
+            "embedding_model": settings.embedding.model,
             "language": settings.chroma_meta.language,
         },
     )

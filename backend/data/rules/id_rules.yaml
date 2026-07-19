@@ -1,0 +1,62 @@
+# 印度尼西亚 PPh/VAT 合规规则配置
+country_code: ID
+country_name: 印度尼西亚
+version: 1.0
+description: 印度尼西亚跨境电商 PPh/VAT 合规审核规则
+
+# 审核规则列表
+rules:
+  - rule_id: ID_R001
+    description: 印度尼西亚 PKP（VAT）登记门槛
+    category: registration
+    condition: annual_sales >= 4800000000
+    risk_template:
+      risk_level: 高风险
+      risk_desc: 年营业额已达到或超过印尼 PKP（应税企业）强制登记门槛（IDR 4,800,000,000）
+      trigger_condition: 年销售额 ≥ IDR 4.8B
+      regulation_base: 印尼PMK-131跨境电商
+      violation_consequence: 未登记 PKP 继续销售将无法开具税务发票并面临罚款与补缴
+
+  - rule_id: ID_R002
+    description: 缺失 NPWP 税号
+    category: entity
+    condition: has_npwp in ['否', '办理中']
+    risk_template:
+      risk_level: 高风险
+      risk_desc: 未取得印尼税号 NPWP，无法履行 PPh/VAT 申报义务，且预扣税率将按更高档次征收
+      trigger_condition: 无 NPWP 或办理中
+      regulation_base: 印尼一般税务条款与程序法
+      violation_consequence: 交易预扣税率提高 100%，且无法进项抵扣
+
+  - rule_id: ID_R003
+    description: 跨境电商 PMSE VAT 代征
+    category: import
+    condition: business_type in ['跨境电商零售', '本地仓配']
+    risk_template:
+      risk_level: 中风险
+      risk_desc: 印尼对跨境电商 PMSE 卖家/平台指定为 VAT 代征人，需按月申报并缴纳 11% VAT
+      trigger_condition: 面向印尼消费者的跨境电商销售
+      regulation_base: 印尼PMK-131跨境电商
+      violation_consequence: 未按月申报 PMSE VAT 可能被列入不合规名单并处罚
+
+  - rule_id: ID_R004
+    description: 进口许可证缺失
+    category: import
+    condition: import_license == '无'
+    risk_template:
+      risk_level: 中风险
+      risk_desc: 未持有进口商识别号（API/NPIK），可能无法合法进口商品或面临清关延误
+      trigger_condition: 进口许可证类型为无
+      regulation_base: 印尼进口商识别号规定
+      violation_consequence: 货物无法清关，滞港费用与合规风险上升
+
+# 默认建议列表
+suggestions:
+  - type: general
+    content: 达到 IDR 4.8B 门槛前完成 PKP 登记，确保可开具合规税务发票 (Faktur Pajak)
+  - type: general
+    content: 尽快办理 NPWP 税号，避免预扣税率被上调 100%
+  - type: general
+    content: 若面向印尼消费者的跨境电商销售，需在 PMSE 制度下按月申报 11% VAT
+  - type: general
+    content: 涉及进口业务的卖家应申请 API-U/API-P 进口商识别号，避免清关风险

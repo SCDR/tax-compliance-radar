@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from tax_compliance_radar.config import DATA_DIR
+from tax_compliance_radar.services.safe_eval import SafeRuleEvaluator
 from tax_compliance_radar.models.schemas import SourcedRiskItem, SourcedSuggestion, SourceInfo
 
 
@@ -40,17 +41,18 @@ class ComplianceRule:
             触发的风险项，如未触发则返回 None
         """
         try:
-            # 准备 eval 环境变量 - 自动注入所有业务数据字段（支持扩展）
-            eval_globals = {
+            # 准备命名空间 - 自动注入所有业务数据字段（支持扩展）
+            names = {
                 "registration_threshold": config.registration_threshold,
             }
 
             # 自动注入所有业务数据字段 - 无需硬编码，支持新维度自动扩展
             for key, value in business_data.items():
-                eval_globals[key] = value
+                names[key] = value
 
-            # 执行条件判断
-            result = eval(self.condition, eval_globals)
+            # 使用安全的规则评估器
+            evaluator = SafeRuleEvaluator(names=names)
+            result = evaluator.eval(self.condition)
 
             if result:
                 platforms_str = ", ".join(business_data.get("platforms", []))

@@ -12,6 +12,7 @@
     "@microsoft/fetch-event-source": "^2.0.1",
     "antd": "^5.21.6",
     "axios": "^1.7.2",
+    "html-docx-js-typescript": "^0.1.5",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^5.0.7",
@@ -19,6 +20,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
+    "recharts": "^3.9.2",
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {

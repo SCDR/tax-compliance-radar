@@ -99,6 +99,45 @@ def _clean_markdown(text: str) -> str:
 
 
 def chunk_text(text: str, chunk_size: int | None = None, chunk_overlap: int | None = None) -> list[str]:
+    """兼容旧调用：只返回 chunk 文本数组。新逻辑走 chunk_document。"""
+    return [c["text"] for c in chunk_document(text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)]
+
+
+def _is_boilerplate_block(block: str) -> bool:
+    """判断一个 block 是否是"引用样板"，比如
+       `> 关联主文档：[[...]]`、`> 参考：[[...]]`。
+    这些内容在 citation 类文档里很常见，把它们纳入 embedding 会把整个 chunk
+    拉向"关联文档"语义，检索命中的却不是真正的正文条款。
+    索引时跳过，但仍保留在原始 markdown 中，前端渲染依然可见。
+    """
+    text = block.strip()
+    if not text:
+        return True
+    # 以 > 开头的引用块且包含 wiki 链接或"关联"字样
+    if text.startswith(">") and re.search(r"关联|\[\[[^\]]+\]\]", text):
+        return True
+    return False
+
+
+def split_blocks(body: str) -> list[str]:
+    """按空行把 markdown 正文切成 block 数组（保留原始 markdown 标记）。
+    这个切分**必须与前端完全一致** —— 前端 RegulationModal 会以同样的 `/\n{2,}/` 切分并给每个 block
+    挂 `data-block="N"` 属性，检索命中时靠 block 索引精准定位，不再依赖字符串模糊匹配。
+    """
+    return [b.strip() for b in re.split(r"\n{2,}", body) if b.strip()]
+
+
+def chunk_document(
+    body: str,
+    chunk_size: int | None = None,
+    chunk_overlap: int | None = None,
+) -> list[dict[str, Any]]:
+    """按 block 聚合成 chunk，每个 chunk 记录首个 block 的索引 —— 用于原文精准定位。
+
+    返回：[{ "text": 用于 embedding 的清洗后文本, "block_start": 首块索引, "block_end": 末块索引 }]
+    - chunk_size 用于控制单个 chunk 的最大字符数（近似上限，单块超长时不硬切）
+    - chunk_overlap 用非负字符数控制两 chunk 之间的 block 级重叠
+    """
     chunk_size = chunk_size if chunk_size is not None else settings.rag.chunk_size
     chunk_overlap = chunk_overlap if chunk_overlap is not None else settings.rag.chunk_overlap
     if chunk_size <= 0:
@@ -108,20 +147,58 @@ def chunk_text(text: str, chunk_size: int | None = None, chunk_overlap: int | No
     if chunk_overlap >= chunk_size:
         raise ValueError("chunk_overlap must be smaller than chunk_size")
 
-    # 先清理Markdown标记再分块
-    cleaned_text = _clean_markdown(text)
+    blocks = split_blocks(body)
+    if not blocks:
+        return []
 
-    chunks: list[str] = []
-    start = 0
-    length = len(cleaned_text)
-    while start < length:
-        end = min(start + chunk_size, length)
-        chunk = cleaned_text[start:end].strip()
-        if chunk:
-            chunks.append(chunk)
-        if end >= length:
+    # 为 embedding 准备清洗后的 block 文本（剥掉 markdown 标记，语义更纯）
+    # 样板 block（`> 关联主文档：[[...]]` 等）在此清空，避免拉偏 embedding；
+    # 位置索引仍占位，保证前端 data-block 与后端 block_start 完全对齐。
+    clean_blocks = [
+        "" if _is_boilerplate_block(b) else _clean_markdown(b) for b in blocks
+    ]
+
+    chunks: list[dict[str, Any]] = []
+    n = len(blocks)
+    i = 0
+    while i < n:
+        start_idx = i
+        current: list[str] = []
+        size = 0
+        while i < n:
+            piece = clean_blocks[i]
+            if not piece:
+                i += 1
+                continue
+            # 至少收一个 block；后续 block 加入若会超过 chunk_size 就停
+            if current and size + len(piece) + 2 > chunk_size:
+                break
+            current.append(piece)
+            size += len(piece) + 2
+            i += 1
+        if not current:
+            # 全空 block 尾部保护
             break
-        start = end - chunk_overlap
+        end_idx = i - 1
+        chunks.append(
+            {
+                "text": "\n\n".join(current).strip(),
+                "block_start": start_idx,
+                "block_end": end_idx,
+            }
+        )
+
+        # overlap：从末尾往回回退若干 block，作为下一 chunk 起点
+        if i >= n:
+            break
+        overlap_chars = 0
+        j = end_idx
+        while j > start_idx and overlap_chars < chunk_overlap:
+            overlap_chars += len(clean_blocks[j])
+            j -= 1
+        # 至少推进 1 个 block，避免死循环
+        i = max(j + 1, start_idx + 1)
+
     return chunks
 
 
@@ -173,7 +250,7 @@ def _get_collection(reset_collection: bool = False):
         name=CHROMA_COLLECTION_NAME,
         metadata={
             "description": settings.chroma_meta.description,
-            "embedding_model": settings.llm.embedding_model,
+            "embedding_model": settings.embedding.model,
             "language": settings.chroma_meta.language,
             "hnsw:space": settings.chroma_meta.similarity_space,
         },
@@ -181,10 +258,10 @@ def _get_collection(reset_collection: bool = False):
 
 
 def _embed_batch(texts: list[str]) -> list[list[float]]:
-    client = ollama.Client(host=settings.llm.base_url)
+    client = ollama.Client(host=settings.embedding.base_url)
     vectors: list[list[float]] = []
     for text in texts:
-        result = client.embeddings(model=settings.llm.embedding_model, prompt=text)
+        result = client.embeddings(model=settings.embedding.model, prompt=text)
         vectors.append(result["embedding"])
     return vectors
 
@@ -212,7 +289,8 @@ def load_regulations(
         doc = parse_regulation_file(file_path)
         _upsert_document_metadata(doc)
 
-        chunks = chunk_text(doc.content, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        chunks_meta = chunk_document(doc.content, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        chunks = [c["text"] for c in chunks_meta]
         vectors = _embed_batch(chunks)
 
         ids = [f"{doc.doc_id}:{idx}" for idx in range(len(chunks))]
@@ -224,6 +302,9 @@ def load_regulations(
                 "chapter": doc.chapter,
                 "effective_time": doc.effective_time,
                 "original_link": doc.original_link,
+                # block 级定位信息 —— 与前端 split_blocks 保持完全一致
+                "block_start": chunks_meta[idx]["block_start"],
+                "block_end": chunks_meta[idx]["block_end"],
             }
             for idx in range(len(chunks))
         ]

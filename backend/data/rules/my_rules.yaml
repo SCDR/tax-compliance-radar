@@ -1,0 +1,49 @@
+# 马来西亚 SST/VAT 合规规则配置
+country_code: MY
+country_name: 马来西亚
+version: 1.0
+description: 马来西亚跨境电商 SST/VAT 合规审核规则
+
+# 审核规则列表
+rules:
+  - rule_id: MY_R001
+    description: 马来西亚年销售额超过 SST 登记门槛
+    category: registration
+    condition: annual_sales >= 500000
+    risk_template:
+      risk_level: 高风险
+      risk_desc: 年销售额已达到或超过马来西亚 SST 强制登记门槛（RM 500,000）
+      trigger_condition: 年销售额 ≥ RM 500,000
+      regulation_base: 马来SST门槛下调
+      violation_consequence: 未登记继续销售可能面临补缴税款、罚款及利息
+
+  - rule_id: MY_R002
+    description: 跨境电商低价进口 LVG 合规
+    category: import
+    condition: business_type in ['跨境电商零售', '品牌出海直营']
+    risk_template:
+      risk_level: 中风险
+      risk_desc: 马来西亚对低价进口商品（LVG，价值 ≤ RM 500）征收 10% 销售税，卖家需注册 LVG 账户并按期申报
+      trigger_condition: 开展马来西亚跨境电商业务且商品单价 ≤ RM 500
+      regulation_base: 马来西亚 LVG 制度
+      violation_consequence: 未注册或未申报 LVG 销售税可能被海关扣货并处罚
+
+  - rule_id: MY_R003
+    description: 未设本地实体的税务代表要求
+    category: entity
+    condition: has_local_entity == '否'
+    risk_template:
+      risk_level: 中风险
+      risk_desc: 未在马来西亚设立本地实体的境外卖家需委任本地税务代表办理 SST 登记与申报
+      trigger_condition: 无本地公司主体
+      regulation_base: 马来西亚皇家关税局 SST 指南
+      violation_consequence: 缺少本地代表将无法完成合规登记，面临无法开票、被平台下架的风险
+
+# 默认建议列表
+suggestions:
+  - type: general
+    content: 建议尽早评估年销售额是否触发 SST 登记门槛，并在达到门槛后 28 天内完成登记
+  - type: general
+    content: 若涉及低价进口商品，请注册 LVG 账户并按月申报 10% 销售税
+  - type: general
+    content: 无本地实体的卖家应尽快委任马来西亚税务代表，并核实其 SST 备案资质

@@ -22,6 +22,8 @@ class RetrievedDoc:
     similarity_score: float
     original_link: str
     chapter: str
+    block_start: int = -1
+    block_end: int = -1
 
 
 @dataclass(frozen=True)
@@ -99,6 +101,8 @@ def search_regulations(query_text: str, top_k: int = TOP_K_RESULTS) -> Retrieval
                     similarity_score=round(similarity, 4),
                     original_link=meta.get("original_link", ""),
                     chapter=meta.get("chapter", ""),
+                    block_start=int(meta.get("block_start", -1)),
+                    block_end=int(meta.get("block_end", -1)),
                 )
             )
 

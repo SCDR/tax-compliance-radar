@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
+import { getProfileId } from './profile'
 
 function safeParseJson(text) {
   if (typeof text !== 'string' || !text.trim()) {
@@ -46,6 +47,20 @@ const api = axios.create({
   timeout: 60000,  // LLM响应需要更长时间，设置为60秒
 })
 
+// 请求拦截器：自动附上 X-Profile-Id
+api.interceptors.request.use((config) => {
+  try {
+    const pid = getProfileId()
+    if (pid) {
+      config.headers = config.headers || {}
+      config.headers['X-Profile-Id'] = pid
+    }
+  } catch {
+    // ignore
+  }
+  return config
+})
+
 export async function submitQa(queryText) {
   const { data } = await api.post('/qa/query', { query_text: queryText })
   return data
@@ -80,7 +95,8 @@ export async function submitStreamQaWithMode(queryText, thinkMode = false) {
  */
 export function listenQaStream(taskId, callbacks) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
-  const url = `${baseUrl}/qa/stream/${taskId}`
+  const pid = getProfileId()
+  const url = `${baseUrl}/qa/stream/${taskId}${pid ? `?profile_id=${encodeURIComponent(pid)}` : ''}`
   console.log('Connecting to SSE:', url)
   const controller = new AbortController()
 
@@ -89,6 +105,7 @@ export function listenQaStream(taskId, callbacks) {
     signal: controller.signal,
     headers: {
       Accept: 'text/event-stream',
+      'X-Profile-Id': pid,
     },
     onopen(response) {
       console.log('SSE connection opened:', response.status, response.headers.get('content-type'))
@@ -213,7 +230,9 @@ export async function submitSseAudit(payload) {
  */
 export function listenAuditResult(taskId, callbacks) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
-  const eventSource = new EventSource(`${baseUrl}/sse/audit/stream/${taskId}`)
+  const pid = getProfileId()
+  const url = `${baseUrl}/sse/audit/stream/${taskId}${pid ? `?profile_id=${encodeURIComponent(pid)}` : ''}`
+  const eventSource = new EventSource(url)
 
   eventSource.addEventListener('start', (e) => {
     const data = JSON.parse(e.data)
@@ -278,7 +297,11 @@ export async function listRegulations() {
 }
 
 export async function fetchRegulationContent(filename) {
-  const { data } = await api.get(`/regulations/${filename}`)
+  const safePath = String(filename)
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/')
+  const { data } = await api.get(`/regulations/${safePath}`)
   return data
 }
 
@@ -286,4 +309,180 @@ export async function fetchRegulationContent(filename) {
 export async function fetchQaDetail(qaId) {
   const { data } = await api.get(`/qa/history/${qaId}`)
   return data
+}
+
+// ==================== 政策推送 / 用户画像 API ====================
+
+export async function fetchProfiles() {
+  const { data } = await api.get('/profile/profiles')
+  return data
+}
+
+export async function fetchProfileDetail(profileId) {
+  const { data } = await api.get(`/profile/profiles/${profileId}`)
+  return data
+}
+
+export async function recomputeProfile(profileId) {
+  const { data } = await api.post(`/profile/profiles/${profileId}/recompute`)
+  return data
+}
+
+export async function fetchPushes(limit = 20) {
+  const { data } = await api.get('/profile/pushes', { params: { limit } })
+  return data
+}
+
+export async function triggerPush(profileId = null, topK = 3) {
+  const { data } = await api.post('/profile/pushes/trigger', {
+    profile_id: profileId,
+    top_k: topK,
+  })
+  return data
+}
+
+export async function dismissPush(pushId) {
+  const { data } = await api.post(`/profile/pushes/${pushId}/dismiss`)
+  return data
+}
+
+export async function fetchDebugSummary() {
+  const { data } = await api.get('/profile/debug/summary')
+  return data
+}
+
+export async function resetSeedProfiles() {
+  const { data } = await api.post('/profile/debug/reset-seed-profiles')
+  return data
+}
+
+export async function rebuildNewsLibrary() {
+  const { data } = await api.post('/news/rebuild')
+  return data
+}
+
+export async function dedupeNewsItems() {
+  const { data } = await api.post('/news/dedupe')
+  return data
+}
+
+export async function fetchNewsList() {
+  const { data } = await api.get('/news/')
+  return data
+}
+
+export async function fetchNewsTags() {
+  const { data } = await api.get('/news/tags')
+  return data
+}
+
+export async function createNews(payload) {
+  const { data } = await api.post('/news/', payload)
+  return data
+}
+
+// 返回 { alias: real_filename } 的完整映射。用于前端判断某个"引用来源" token 是否有源文档可跳转。
+export async function fetchRegulationAliases() {
+  const { data } = await api.get('/regulations/aliases')
+  return data
+}
+
+export async function uploadFile(file) {
+  const form = new FormData()
+  form.append('file', file)
+  const { data } = await api.post('/uploads/', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return data
+}
+
+export async function extractContractFields(file) {
+  const form = new FormData()
+  form.append('file', file)
+  const { data } = await api.post('/uploads/contract-extract', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 90000,
+  })
+  return data
+}
+
+// ==================== 合规指南 API ====================
+
+export async function fetchGuideTagLibrary() {
+  const { data } = await api.get('/guide/tag-library')
+  return data?.data || {}
+}
+
+export async function fetchProfileGuideTags(limit = 12) {
+  const { data } = await api.get('/guide/profile-tags', { params: { limit } })
+  return data?.data || []
+}
+
+export async function submitGuideStream(payload) {
+  const { data } = await api.post('/guide/stream', payload)
+  return data
+}
+
+export async function fetchGuideHistory(limit = 20) {
+  const { data } = await api.get('/guide/history', { params: { limit } })
+  return data?.data || []
+}
+
+export async function fetchGuideDetail(guideId) {
+  const { data } = await api.get(`/guide/history/${guideId}`)
+  return data?.data || null
+}
+
+/**
+ * 监听合规指南 SSE 流
+ * 事件:progress / result_section(section, value) / complete / error
+ */
+export function listenGuideStream(taskId, callbacks) {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+  const pid = getProfileId()
+  const url = `${baseUrl}/guide/stream/${taskId}${pid ? `?profile_id=${encodeURIComponent(pid)}` : ''}`
+  const es = new EventSource(url)
+
+  es.addEventListener('progress', (e) => {
+    try {
+      callbacks.onProgress?.(JSON.parse(e.data))
+    } catch {
+      /* ignore */
+    }
+  })
+
+  es.addEventListener('result_section', (e) => {
+    try {
+      const data = JSON.parse(e.data)
+      callbacks.onSection?.(data)
+    } catch (err) {
+      console.warn('Failed to parse guide result_section', e.data)
+    }
+  })
+
+  es.addEventListener('complete', (e) => {
+    try {
+      callbacks.onComplete?.(JSON.parse(e.data))
+    } catch {
+      callbacks.onComplete?.({})
+    }
+    es.close()
+  })
+
+  es.addEventListener('error', (e) => {
+    try {
+      const data = e.data ? JSON.parse(e.data) : { message: '连接错误' }
+      callbacks.onError?.(data.message || '连接错误')
+    } catch {
+      callbacks.onError?.('连接错误')
+    }
+    es.close()
+  })
+
+  es.onerror = () => {
+    callbacks.onError?.('连接断开')
+    es.close()
+  }
+
+  return es
 }

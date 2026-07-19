@@ -5,13 +5,15 @@ import json
 import asyncio
 import uuid
 from typing import Dict, Any, AsyncGenerator
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from tax_compliance_radar.models.schemas import MultiCountryAuditRequest
 from tax_compliance_radar.factories import StrategyFactory
 from tax_compliance_radar.config import settings
 from tax_compliance_radar.services.db import insert_audit_history
+from tax_compliance_radar.services.policy_pusher import apply_hook
+from tax_compliance_radar.services.tag_extractor import extract_tags_from_audit
 
 router = APIRouter(prefix="/api/v1/sse", tags=["sse"])
 
@@ -25,7 +27,7 @@ def sse_message(event: str, data: Any) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-async def run_audit_task(task_id: str, request: MultiCountryAuditRequest):
+async def run_audit_task(task_id: str, request: MultiCountryAuditRequest, profile_id: str = "default"):
     """在后台异步执行审核任务"""
     try:
         # 创建多国审核策略
@@ -45,7 +47,13 @@ async def run_audit_task(task_id: str, request: MultiCountryAuditRequest):
                 "selected_countries": request.selected_countries,
                 "annual_sales": getattr(request.business_profile, "annual_sales", 0),
             }
-            insert_audit_history(business_info, result_dict)
+            insert_audit_history(business_info, result_dict, profile_id=profile_id)
+            # 触发标签钩子
+            try:
+                deltas = extract_tags_from_audit(business_info, result_dict)
+                apply_hook(profile_id, deltas, source="audit")
+            except Exception as hook_error:  # noqa: BLE001
+                print(f"[sse] apply_hook failed: {hook_error}")
         except Exception as save_error:
             print(f"[WARNING] 保存审核历史失败: {save_error}")
 
@@ -60,9 +68,10 @@ async def run_audit_task(task_id: str, request: MultiCountryAuditRequest):
 
 
 @router.post("/audit/submit")
-async def submit_audit_sse(request: MultiCountryAuditRequest):
+async def submit_audit_sse(request: MultiCountryAuditRequest, http_request: Request):
     """提交审核任务，立即返回任务ID，后续通过 SSE 流式获取结果"""
     task_id = str(uuid.uuid4())[:8]
+    profile_id = (http_request.headers.get("x-profile-id") or "default").strip() or "default"
 
     # 初始化任务
     _active_tasks[task_id] = {
@@ -70,10 +79,11 @@ async def submit_audit_sse(request: MultiCountryAuditRequest):
         "progress": 0,
         "result": None,
         "error": None,
+        "profile_id": profile_id,
     }
 
     # 启动后台任务
-    asyncio.create_task(run_audit_task(task_id, request))
+    asyncio.create_task(run_audit_task(task_id, request, profile_id=profile_id))
 
     return {
         "task_id": task_id,

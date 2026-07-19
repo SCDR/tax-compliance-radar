@@ -9,7 +9,7 @@ from tax_compliance_radar.services.disclaimer import get_disclaimer
 from tax_compliance_radar.services.retrieval_service import search_regulations
 
 
-def query_qa(query_text: str) -> QAQueryData:
+def query_qa(query_text: str, profile_id: str = "default") -> QAQueryData:
     """
     完整RAG QA工作流：
     1. 相似度0.7检索法规
@@ -33,7 +33,7 @@ def query_qa(query_text: str) -> QAQueryData:
         answer = generate_qa_answer_with_rag(query_text, retrieval_result)
         doc_ids = [doc.doc_id for doc in retrieval_result.documents]
 
-    qa_id = insert_qa_history(query_text, answer.model_dump(), doc_ids)
+    qa_id = insert_qa_history(query_text, answer.model_dump(), doc_ids, profile_id=profile_id)
 
     return QAQueryData(
         qa_id=qa_id,

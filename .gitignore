@@ -20,6 +20,9 @@ backend/.pytest_cache/
 backend/data/app.db
 backend/data/chroma_db/
 backend/data/*.db
+backend/data/regulations/_generated/
+backend/data/regulations/东南亚税务政策来源/
+backend/data/regulations/东南亚税务政策来源/**/*.txt
 backend/dist/
 backend/build/
 node_modules/

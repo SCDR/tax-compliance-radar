@@ -43,7 +43,7 @@ const CarouselStrategy = () => {
 
   return (
     <div className="thinking-indicator">
-      <LoadingOutlined className="thinking-spin loading-icon" style={{ fontSize: '32px', color: '#667eea' }} />
+      <LoadingOutlined className="thinking-spin loading-icon" style={{ fontSize: '28px', color: 'var(--ink-500)' }} />
       <div className="thinking-text-wrapper">
         <span className={`thinking-text ${isFading ? 'fade-out' : 'fade-in'}`}>
           {currentText}

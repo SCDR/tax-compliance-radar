@@ -14,7 +14,7 @@ rules:
       risk_level: 中风险
       risk_desc: 越南对跨境电商实施新的VAT申报要求，需按季度申报
       trigger_condition: 开展越南跨境电商业务
-      regulation_base: 越南VAT新政2025
+      regulation_base: 越南电子发票新规
       violation_consequence: 未按时申报可能面临罚款
 
 # 默认建议列表

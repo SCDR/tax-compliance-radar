@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Modal, Spin, Typography, Space, Button, Tag, message } from 'antd';
 import { FileTextOutlined, DownloadOutlined } from '@ant-design/icons';
 import { fetchQaDetail } from '../api/client';
+import { getRegulationAliases, getRegulationAliasesSync } from '../api/regulationAliases';
+import AIGeneratedBadge from './AIGeneratedBadge';
 import { exportQAResultToPDF } from '../utils/pdfExport';
 
 const { Paragraph, Text } = Typography;
@@ -15,25 +17,30 @@ const REGULATION_TITLES = {
 };
 
 // 检测并提取回答中的引用来源，返回可点击的JSX
-const renderAnswerWithSourceLinks = (answer, onSourceClick) => {
+// sourceFiles 可从外部传入（后端历史接口返回的 sources 字段）；否则从 answer 文本里的 marker 解析
+const renderAnswerWithSourceLinks = (answer, onSourceClick, aliases = null, externalSources = null) => {
   if (!answer) return '暂无回答';
 
   // 分离回答主体和引用来源
   const sourceMarker = '**引用来源：**';
   const sourceIndex = answer.indexOf(sourceMarker);
 
-  if (sourceIndex === -1) {
+  let mainAnswer = answer;
+  let sourceFiles = [];
+
+  if (sourceIndex !== -1) {
+    mainAnswer = answer.substring(0, sourceIndex);
+    const sourcesPart = answer.substring(sourceIndex + sourceMarker.length);
+    sourceFiles = sourcesPart
+      .split(/[;；]/)
+      .map((s) => s.trim())
+      .filter((s) => s && s.length > 0);
+  } else if (Array.isArray(externalSources) && externalSources.length > 0) {
+    // 历史详情：answer 文本里不带 marker，用后端接口返回的 sources 独立渲染
+    sourceFiles = externalSources;
+  } else {
     return <span>{answer}</span>;
   }
-
-  const mainAnswer = answer.substring(0, sourceIndex);
-  const sourcesPart = answer.substring(sourceIndex + sourceMarker.length);
-
-  // 解析来源列表
-  const sourceFiles = sourcesPart
-    .split(/[;；]/)
-    .map(s => s.trim())
-    .filter(s => s && s.length > 0);
 
   return (
     <>
@@ -42,24 +49,50 @@ const renderAnswerWithSourceLinks = (answer, onSourceClick) => {
         <Text strong style={{ display: 'block', marginBottom: '8px' }}>引用来源：</Text>
         <Space wrap size="small">
           {sourceFiles.map((source, idx) => {
-            // 检测是否是文件名
-            const isFile = Object.keys(REGULATION_TITLES).some(filename => source.includes(filename));
-            if (isFile) {
-              const matchedFilename = Object.keys(REGULATION_TITLES).find(filename => source.includes(filename));
+            // 1) 硬编码 REGULATION_TITLES 中的旧文件名
+            const matchedFilename = Object.keys(REGULATION_TITLES).find(filename => source.includes(filename));
+            if (matchedFilename) {
               return (
                 <Tag
                   key={idx}
-                  color="blue"
+                  className="source-tag"
                   icon={<FileTextOutlined />}
-                  onClick={() => onSourceClick(matchedFilename, REGULATION_TITLES[matchedFilename])}
+                  onClick={() => onSourceClick(matchedFilename, REGULATION_TITLES[matchedFilename], null)}
                   style={{ cursor: 'pointer' }}
                 >
                   {REGULATION_TITLES[matchedFilename]}
                 </Tag>
               );
             }
-            // 普通文本来源
-            return <Tag key={idx}>{source}</Tag>;
+            // 2) 后端别名表命中（宽松匹配：精确 → 去装饰 → substring 双向包含）
+            const decorate = /(^[0-9]+[.、)）]\s*|\s*\.md$|^【|】$|^《|》$|^"|"$|^'|'$)/g;
+            const cleaned = source.replace(decorate, '').trim();
+            let hit = null;
+            if (aliases) {
+              if (aliases[source]) hit = source;
+              else if (aliases[cleaned]) hit = cleaned;
+              else {
+                for (const alias of Object.keys(aliases)) {
+                  if (!alias) continue;
+                  if (source.includes(alias) || alias.includes(cleaned)) { hit = alias; break; }
+                }
+              }
+            }
+            if (hit) {
+              return (
+                <Tag
+                  key={idx}
+                  className="source-tag"
+                  icon={<FileTextOutlined />}
+                  onClick={() => onSourceClick(hit, hit, null)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {source}
+                </Tag>
+              );
+            }
+            // 3) 未命中：纯文本 tag（不可点击，避免 404）
+            return <Tag key={idx} className="source-tag-plain">{source}</Tag>;
           })}
         </Space>
       </div>
@@ -77,6 +110,22 @@ const renderAnswerWithSourceLinks = (answer, onSourceClick) => {
 const QaHistoryModal = ({ open, qaId, onClose, onSourceClick }) => {
   const [loading, setLoading] = useState(false);
   const [qaData, setQaData] = useState(null);
+  const [aliases, setAliases] = useState(() => getRegulationAliasesSync());
+
+  useEffect(() => {
+    if (open && !aliases) {
+      getRegulationAliases().then(setAliases);
+    }
+  }, [open, aliases]);
+
+  // 包一层：从 qaData.snippets / qaData.positions 里取对应文件的定位信息一起传给外层
+  const handleSourceClick = (filename, title) => {
+    const list = qaData?.snippets?.[filename];
+    const snippet = Array.isArray(list) ? list[0] || '' : (list || '');
+    const posList = qaData?.positions?.[filename];
+    const positions = Array.isArray(posList) && posList.length ? posList : null;
+    onSourceClick(filename, title, snippet, positions);
+  };
 
   useEffect(() => {
     if (open && qaId) {
@@ -115,7 +164,7 @@ const QaHistoryModal = ({ open, qaId, onClose, onSourceClick }) => {
       style={{ top: 20 }}
       footer={
         qaData && (
-          <Button icon={<DownloadOutlined />} onClick={handleExport}>
+          <Button className="pdf-export-btn" icon={<DownloadOutlined />} onClick={handleExport}>
             导出PDF
           </Button>
         )
@@ -130,28 +179,24 @@ const QaHistoryModal = ({ open, qaId, onClose, onSourceClick }) => {
 
             <div style={{ marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '8px' }}>
-                <Tag color="blue">问题</Tag>
+                <Tag className="section-tag section-tag-question">问题</Tag>
               </div>
-              <div
-                style={{
-                  padding: '16px 20px',
-                  background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.05) 100%)',
-                  borderRadius: '12px',
-                  borderLeft: '4px solid #667eea',
-                }}
-              >
-                <Text strong style={{ fontSize: '15px' }}>{qaData.query_text}</Text>
+              <div className="qa-question-block">
+                <Text strong style={{ fontSize: '14px' }}>{qaData.query_text}</Text>
               </div>
             </div>
 
             <div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '8px' }}>
-                <Tag color="green">回答</Tag>
+                <Tag className="section-tag section-tag-answer">回答</Tag>
               </div>
+              <AIGeneratedBadge style={{ marginBottom: '12px' }} />
               <Paragraph style={{ whiteSpace: 'pre-wrap', lineHeight: '1.8', paddingLeft: '4px' }}>
                 {renderAnswerWithSourceLinks(
                   qaData.answer_text?.answer || qaData.answer_text?.core_rules,
-                  onSourceClick
+                  handleSourceClick,
+                  aliases,
+                  qaData.sources,
                 )}
               </Paragraph>
             </div>

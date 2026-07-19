@@ -401,3 +401,211 @@ export const exportAuditReportToPDF = (auditResult) => {
   const html = generateAuditReportHTML(auditResult);
   printToPDF(html, filename);
 };
+
+// ============================================================
+// 合规指南（模块四）导出
+// ============================================================
+
+const PRIORITY_STARS = { 3: '★★★', 2: '★★☆', 1: '★☆☆' };
+
+const escapeHtml = (str) =>
+  String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+const COUNTRY_CN = { TH: '泰国', ID: '印尼', MY: '马来西亚', VN: '越南', SG: '新加坡', PH: '菲律宾' };
+
+/**
+ * 生成合规指南的 HTML —— PDF 与 Word 共用同一份。
+ */
+export const buildGuideHtml = (guide) => {
+  const {
+    sections = [],
+    appendix_timeline = [],
+    appendix_glossary = [],
+    input = {},
+    statusMap = {},
+  } = guide || {};
+
+  const DONE_STATUSES = new Set(['已确认', '已排查', '已知悉', '已建立流程']);
+  const statusFor = (sectionKey, seq) => {
+    const raw = statusMap[`${sectionKey}:${seq}`] || '待办理';
+    const glyph = DONE_STATUSES.has(raw) ? '☑' : '☐';
+    return { text: raw, glyph, done: DONE_STATUSES.has(raw) };
+  };
+
+  const countriesText = (input.countries || []).map((c) => COUNTRY_CN[c] || c).join('、') || '—';
+  const bt = input.business_type || '跨境电商';
+  const tags = (input.tags || []).join('、') || '—';
+  const dateStr = new Date().toLocaleDateString('zh-CN');
+
+  const sectionHtml = sections
+    .map((sec) => {
+      const items = (sec.items || [])
+        .map((it) => {
+          const priority = PRIORITY_STARS[it.priority] || '★★☆';
+          const st = statusFor(sec.key, it.seq);
+          const sourcesLine = (it.sources || [])
+            .map((s) => escapeHtml(s.doc_name || s.filename || ''))
+            .filter(Boolean)
+            .join('；');
+          const optional = [
+            it.cost_hint && `<div><strong>合规成本参考：</strong>${escapeHtml(it.cost_hint)}</div>`,
+            it.operation_hint && `<div><strong>实务操作指引：</strong>${escapeHtml(it.operation_hint)}</div>`,
+          ]
+            .filter(Boolean)
+            .join('');
+          return `
+            <tr class="no-break${st.done ? ' row-done' : ''}">
+              <td class="col-seq">${escapeHtml(it.seq || '')}</td>
+              <td class="col-title"><strong>${escapeHtml(it.title || '')}</strong></td>
+              <td class="col-req">
+                <div>${escapeHtml(it.requirement || '')}</div>
+                ${it.explanation ? `<div class="hint"><strong>解释：</strong>${escapeHtml(it.explanation)}</div>` : ''}
+                ${it.advice_and_risk ? `<div class="hint"><strong>建议与风险：</strong>${escapeHtml(it.advice_and_risk)}</div>` : ''}
+                ${optional}
+                ${sourcesLine ? `<div class="src"><strong>来源：</strong>${sourcesLine}</div>` : ''}
+              </td>
+              <td class="col-basis">${escapeHtml(it.legal_basis || '')}</td>
+              <td class="col-priority">${priority}</td>
+              <td class="col-status">${st.glyph} ${escapeHtml(st.text)}</td>
+            </tr>
+          `;
+        })
+        .join('');
+
+      return `
+        <section class="guide-section">
+          <h2>${escapeHtml(sec.title || sec.key)}（${(sec.items || []).length} 条）</h2>
+          ${
+            items
+              ? `<table class="checklist"><thead>
+                  <tr>
+                    <th class="col-seq">序号</th>
+                    <th class="col-title">事项</th>
+                    <th class="col-req">具体要求</th>
+                    <th class="col-basis">法律依据</th>
+                    <th class="col-priority">优先级</th>
+                    <th class="col-status">状态</th>
+                  </tr>
+                </thead><tbody>${items}</tbody></table>`
+              : '<p class="empty">本板块未检索到匹配法规</p>'
+          }
+        </section>`;
+    })
+    .join('');
+
+  const timelineHtml = appendix_timeline.length
+    ? `<section class="guide-section">
+         <h2>附录 A · 时间节点汇总</h2>
+         <table class="appendix"><thead><tr><th>事项</th><th>时间节点</th><th>备注</th></tr></thead><tbody>
+           ${appendix_timeline
+             .map(
+               (r) =>
+                 `<tr><td>${escapeHtml(r.item)}</td><td>${escapeHtml(r.deadline)}</td><td>${escapeHtml(r.note)}</td></tr>`,
+             )
+             .join('')}
+         </tbody></table>
+       </section>`
+    : '';
+
+  const glossaryHtml = appendix_glossary.length
+    ? `<section class="guide-section">
+         <h2>附录 B · 法律依据速查</h2>
+         <table class="appendix"><thead><tr><th>缩写</th><th>全称</th><th>中文</th></tr></thead><tbody>
+           ${appendix_glossary
+             .map(
+               (r) =>
+                 `<tr><td>${escapeHtml(r.abbr)}</td><td>${escapeHtml(r.full)}</td><td>${escapeHtml(r.cn)}</td></tr>`,
+             )
+             .join('')}
+         </tbody></table>
+       </section>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8" />
+<title>跨境电商合规自检清单</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: "PingFang SC", "Microsoft YaHei", "Heiti SC", sans-serif; color: #0f172a; margin: 0; padding: 24px 28px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  h2 { font-size: 15px; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #a68a5b; color: #0f172a; }
+  .meta { color: #64748b; font-size: 12px; margin-bottom: 20px; }
+  .meta span { margin-right: 14px; }
+  .disclaimer { color: #94a3b8; font-size: 11px; margin-top: 28px; font-style: italic; }
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 12px; }
+  th, td { border: 1px solid #e2e8f0; padding: 6px 8px; vertical-align: top; text-align: left; }
+  thead { background: #f8fafc; }
+  thead th { font-weight: 600; }
+  tr.row-done td { background: #f7f5ef; color: #64748b; }
+  tr.row-done td.col-status { color: #3d5c47; font-weight: 600; }
+  .col-seq { width: 44px; text-align: center; }
+  .col-title { width: 130px; }
+  .col-basis { width: 200px; font-family: Menlo, Consolas, monospace; font-size: 11px; }
+  .col-priority { width: 68px; color: #a68a5b; text-align: center; letter-spacing: 1px; }
+  .col-status { width: 96px; text-align: center; color: #64748b; }
+  .hint { color: #475569; margin-top: 4px; font-size: 11px; line-height: 1.55; }
+  .src { color: #a68a5b; margin-top: 4px; font-size: 11px; }
+  .empty { color: #94a3b8; font-size: 12px; padding: 8px 0; }
+  .appendix td:first-child, .appendix th:first-child { width: 120px; }
+  @media print {
+    @page { margin: 14mm 12mm; size: A4 landscape; }
+    thead { display: table-header-group; }
+    tr, .no-break { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+  <h1>跨境电商合规自检清单</h1>
+  <div class="meta">
+    <span><strong>目标国家：</strong>${escapeHtml(countriesText)}</span>
+    <span><strong>业务类型：</strong>${escapeHtml(bt)}</span>
+    <span><strong>关注标签：</strong>${escapeHtml(tags)}</span>
+    <span><strong>生成日期：</strong>${dateStr}</span>
+  </div>
+  ${sectionHtml}
+  ${timelineHtml}
+  ${glossaryHtml}
+  <div class="disclaimer">本清单由 AI 基于检索到的公开法规生成，仅供参考，不构成税务/法律意见，不替代专业顾问服务。</div>
+</body></html>`;
+};
+
+/**
+ * PDF 导出（复用浏览器打印方案）
+ */
+export const exportGuideToPDF = (guide) => {
+  if (!guide) return;
+  const filename = `跨境电商合规自检清单_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}`;
+  const html = buildGuideHtml(guide);
+  printToPDF(html, filename);
+};
+
+/**
+ * Word 导出 - 使用 html-docx-js 生成 .docx
+ */
+export const exportGuideToDocx = async (guide) => {
+  if (!guide) return;
+  const html = buildGuideHtml(guide);
+  try {
+    const { asBlob } = await import('html-docx-js-typescript');
+    const blob = await asBlob(html, { orientation: 'landscape', margins: { top: 720, right: 720, bottom: 720, left: 720 } });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `跨境电商合规自检清单_${new Date()
+      .toLocaleDateString('zh-CN')
+      .replace(/\//g, '-')}.docx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+  } catch (err) {
+    console.error('导出 Word 失败:', err);
+    alert('导出 Word 失败，请重试或改用 PDF 导出');
+  }
+};

@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react'
 import { Card, List, Space, Tag, Typography, Skeleton } from 'antd'
+import { FileTextOutlined } from '@ant-design/icons'
 import StreamingStructuredText from './StreamingStructuredText'
+import { getRegulationAliases, getRegulationAliasesSync } from '../api/regulationAliases'
 
 const { Paragraph, Text } = Typography
 
@@ -31,7 +34,7 @@ const renderStructuredField = (label, value, isLoading = false) => {
         <Text strong>{label}：</Text>
         <Space wrap size="small" style={{ marginTop: '8px' }}>
           {value.length > 0 ? value.map((item, index) => (
-            <Tag key={`${label}-${index}`} color="blue">
+            <Tag key={`${label}-${index}`} className="source-tag">
               {isPlainObject(item) ? formatFallbackValue(item) : formatFallbackValue(item)}
             </Tag>
           )) : <Text type="secondary">暂无</Text>}
@@ -43,7 +46,7 @@ const renderStructuredField = (label, value, isLoading = false) => {
     return (
       <div>
         <Text strong>{label}：</Text>
-        <div style={{ marginTop: '8px', padding: '12px', borderRadius: '12px', background: 'rgba(102, 126, 234, 0.04)', border: '1px solid rgba(102, 126, 234, 0.12)' }}>
+        <div className="audit-related-block">
           {Object.entries(value).map(([key, nestedValue], index) => (
             <div key={`${label}-${key}`} style={{ marginBottom: index === Object.keys(value).length - 1 ? 0 : '8px' }}>
               <Text type="secondary">{key}：</Text>
@@ -66,12 +69,51 @@ const renderStructuredField = (label, value, isLoading = false) => {
   )
 }
 
+const renderRegulationBase = (value, onRegulationClick, aliases) => {
+  const raw = typeof value === 'string' ? value : formatFallbackValue(value)
+  const tokens = (raw || '')
+    .split(/[;；]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  return (
+    <div>
+      <Text strong>法规依据：</Text>
+      <Space wrap size="small" style={{ marginTop: '6px' }}>
+        {tokens.length > 0 ? tokens.map((token, idx) => {
+          const clickable = onRegulationClick && aliases && aliases[token]
+          if (clickable) {
+            return (
+              <Tag
+                key={`reg-${idx}`}
+                className="source-tag"
+                icon={<FileTextOutlined />}
+                onClick={() => onRegulationClick(token, token)}
+                style={{ cursor: 'pointer' }}
+              >
+                {token}
+              </Tag>
+            )
+          }
+          return (
+            <Tag key={`reg-${idx}`} className="source-tag-plain">{token}</Tag>
+          )
+        }) : <Text type="secondary">暂无</Text>}
+      </Space>
+    </div>
+  )
+}
+
 const AuditResultDisplay = ({
   auditResult,
   getCountryFlag,
   onCountryClick,
+  onRegulationClick,
   isLoading = false,
 }) => {
+  const [aliases, setAliases] = useState(() => getRegulationAliasesSync())
+  useEffect(() => {
+    if (!aliases) getRegulationAliases().then(setAliases)
+  }, [aliases])
   if (!auditResult) {
     return null
   }
@@ -116,8 +158,8 @@ const AuditResultDisplay = ({
               <List.Item className="audit-list-item">
                 <Space direction="vertical" size="small" style={{ width: '100%' }}>
                   <Space wrap>
-                    <Tag color="blue">{getCountryFlag(item.source_info?.country_code)} {item.source_info?.country_name}</Tag>
-                    <Tag color={item.risk_level === '高风险' ? 'red' : item.risk_level === '中风险' ? 'gold' : 'blue'}>
+                    <Tag className="country-tag">{getCountryFlag(item.source_info?.country_code)} {item.source_info?.country_name}</Tag>
+                    <Tag className={`risk-tag ${item.risk_level === '高风险' ? 'risk-high' : item.risk_level === '中风险' ? 'risk-medium' : 'risk-low'}`}>
                       {item.risk_level}
                     </Tag>
                     {item.risk_desc && <Text strong>{item.risk_desc}</Text>}
@@ -134,7 +176,7 @@ const AuditResultDisplay = ({
                       {renderStructuredField('触发条件', item.trigger_condition, isLoading)}
                     </div>
                     <div style={{ width: '100%' }}>
-                      {renderStructuredField('法规依据', item.regulation_base, isLoading)}
+                      {renderRegulationBase(item.regulation_base, onRegulationClick, aliases)}
                     </div>
                     <div style={{ width: '100%' }}>
                       {renderStructuredField('违规后果', item.violation_consequence, isLoading)}
@@ -154,8 +196,8 @@ const AuditResultDisplay = ({
               <List.Item className="audit-list-item">
                 <Space direction="vertical" size="small" style={{ width: '100%' }}>
                   <Space wrap>
-                    <Tag color="blue">{getCountryFlag(item.source_info?.country_code)} {item.source_info?.country_name}</Tag>
-                    <Tag color={item.suggestion_type === 'professional' ? 'green' : 'purple'}>
+                    <Tag className="country-tag">{getCountryFlag(item.source_info?.country_code)} {item.source_info?.country_name}</Tag>
+                    <Tag className={`suggestion-tag ${item.suggestion_type === 'professional' ? 'suggestion-pro' : 'suggestion-general'}`}>
                       {item.suggestion_type === 'professional' ? '专业建议' : '通用建议'}
                     </Tag>
                   </Space>

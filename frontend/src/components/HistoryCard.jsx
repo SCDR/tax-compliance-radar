@@ -76,7 +76,7 @@ const HistoryCard = ({ item, type, onResubmit, onExportPDF }) => {
 
         {/* 展开的详情
         <div className={`history-card-expand ${expanded ? 'expanded' : ''}`}>
-          <div style={{ paddingTop: '12px', borderTop: '1px solid rgba(102, 126, 234, 0.1)' }}>
+          <div style={{ paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
             {renderQAContent()}
             {renderAuditContent()}
 
